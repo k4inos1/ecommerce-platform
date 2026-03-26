@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { WebpayPlus } from 'transbank-sdk';
+import { WebpayPlus, Options, IntegrationCommerceCodes, IntegrationApiKeys, Environment } from 'transbank-sdk';
 import { Order } from '../models/Order';
 import { protect, AuthRequest } from '../middleware/auth';
 
@@ -8,6 +8,13 @@ const router = Router();
 // Transbank test credentials (public, official from Transbank developers)
 // For production, set env vars: TRANSBANK_COMMERCE_CODE + TRANSBANK_API_KEY
 const isProduction = process.env.NODE_ENV === 'production' && process.env.TRANSBANK_COMMERCE_CODE;
+
+// Helper to get integration options
+const getIntegrationOptions = () => new Options(
+  IntegrationCommerceCodes.WEBPAY_PLUS,
+  IntegrationApiKeys.WEBPAY,
+  Environment.Integration
+);
 
 // POST /api/transbank/create — Initiate WebPay Plus transaction
 router.post('/create', protect, async (req: AuthRequest, res: Response) => {
@@ -26,9 +33,10 @@ router.post('/create', protect, async (req: AuthRequest, res: Response) => {
     if (isProduction) {
       // Production: use real credentials from env
       const tx = new WebpayPlus.Transaction(
-        new (require('transbank-sdk').Options)(
-          new (require('transbank-sdk').WebpayPlus.MallTransaction)(),
-          (require('transbank-sdk').Environment).Production
+        new Options(
+          process.env.TRANSBANK_COMMERCE_CODE!,
+          process.env.TRANSBANK_API_KEY!,
+          Environment.Production
         )
       );
       const resp = await tx.create(buyOrder, sessionId, amount, returnUrl);
@@ -36,7 +44,7 @@ router.post('/create', protect, async (req: AuthRequest, res: Response) => {
       url = resp.url;
     } else {
       // Integration (test) mode — Transbank public test credentials
-      const tx = new WebpayPlus.Transaction();
+      const tx = new WebpayPlus.Transaction(getIntegrationOptions());
       const resp = await tx.create(buyOrder, sessionId, amount, returnUrl);
       token = resp.token;
       url = resp.url;
@@ -60,7 +68,11 @@ router.post('/confirm', protect, async (req: AuthRequest, res: Response) => {
     const { token_ws } = req.body;
     if (!token_ws) return res.status(400).json({ message: 'No token_ws' });
 
-    const tx = new WebpayPlus.Transaction();
+    const tx = new (WebpayPlus as any).Transaction(isProduction ? new Options(
+      process.env.TRANSBANK_COMMERCE_CODE!,
+      process.env.TRANSBANK_API_KEY!,
+      Environment.Production
+    ) : getIntegrationOptions());
     const response = await tx.commit(token_ws);
 
     if (response.response_code === 0) {
