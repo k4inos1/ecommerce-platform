@@ -1,19 +1,57 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --brand: 99 102 241;
+    --brand-glow: rgba(99,102,241,0.15);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
-    @apply bg-gray-950 text-gray-100 font-sans;
+    @apply bg-[#080810] text-gray-100;
+    font-family: 'Inter', sans-serif;
+    background-image: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12) 0%, transparent 60%);
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-brand text-white px-6 py-3 rounded-xl font-semibold hover:bg-brand-dark transition-colors duration-200;
+    @apply relative inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold text-sm
+           hover:bg-indigo-500 active:scale-[0.98] transition-all duration-150 shadow-lg shadow-indigo-900/40;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 bg-white/5 text-gray-300 px-5 py-2.5 rounded-xl font-medium text-sm border border-white/10
+           hover:bg-white/10 hover:text-white transition-all duration-150;
   }
   .card {
-    @apply bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden;
+    @apply bg-white/[0.03] border border-white/[0.07] rounded-2xl backdrop-blur-sm;
   }
+  .card-hover {
+    @apply card hover:bg-white/[0.06] hover:border-white/[0.14] hover:-translate-y-0.5 transition-all duration-200;
+  }
+  .input {
+    @apply w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600
+           focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20;
+  }
+  .section-label {
+    @apply text-xs font-mono tracking-[0.2em] uppercase text-gray-500;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-white to-indigo-300 bg-clip-text text-transparent;
+  }
+}
+
+/* Noise texture overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: 0.4;
 }

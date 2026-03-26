@@ -4,19 +4,29 @@ import { Navbar } from '@/components/ui/Navbar';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'TechStore | E-Commerce Platform',
-  description: 'Tienda online de tecnología - React, Next.js, MongoDB',
+  title: 'TechStore — Tecnología Premium',
+  description: 'Los mejores productos tech con envío express, garantía extendida y pagos seguros.',
+  keywords: 'laptops, phones, audio, tablets, wearables, tech, ecommerce',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className="scroll-smooth">
+    <html lang="es">
       <body>
         <CartProvider>
           <Navbar />
-          <main className="min-h-screen">{children}</main>
-          <footer className="border-t border-gray-800 py-8 text-center text-sm text-gray-500 mt-16">
-            © 2025 TechStore · Desarrollado por <span className="text-brand">Ricardo Sanhueza</span>
+          <main className="relative z-10 pt-16">
+            {children}
+          </main>
+          <footer className="relative z-10 mt-24 border-t border-white/[0.05] py-10">
+            <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-gray-600">© 2025 TechStore. Todos los derechos reservados.</div>
+              <div className="flex gap-6 text-sm text-gray-600">
+                <a href="#" className="hover:text-gray-400 transition-colors">Privacidad</a>
+                <a href="#" className="hover:text-gray-400 transition-colors">Términos</a>
+                <a href="#" className="hover:text-gray-400 transition-colors">Contacto</a>
+              </div>
+            </div>
           </footer>
         </CartProvider>
       </body>

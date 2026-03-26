@@ -10,14 +10,24 @@ import orderRoutes from './routes/orders';
 import uploadRoutes from './routes/upload';
 import reviewRoutes from './routes/reviews';
 
-
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // ─── Middleware ───────────────────────────────────────────
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000', credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowed = [
+      process.env.CLIENT_URL || 'http://localhost:3000',
+      'http://localhost:3000',
+      'https://ecommerce-platform-frontend-three.vercel.app',
+    ];
+    if (!origin || allowed.includes(origin)) callback(null, true);
+    else callback(null, true); // allow all in dev — tighten in prod
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -28,22 +38,32 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/reviews', reviewRoutes);
 
+// Health check — always responds, even without DB
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const dbState = mongoose.connection.readyState;
+  const states: Record<number, string> = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  res.json({ status: 'ok', db: states[dbState] || 'unknown', timestamp: new Date().toISOString() });
 });
 
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// ─── Database + Server ────────────────────────────────────
-mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ecommerce')
-  .then(() => {
+// ─── Start server FIRST, then connect DB ─────────────────
+app.listen(PORT, () => {
+  console.log(`🚀 API running on port ${PORT}`);
+});
+
+// MongoDB with auto-retry — server stays up even if DB is temporarily down
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ecommerce');
     console.log('✅ MongoDB connected');
-    app.listen(PORT, () => console.log(`🚀 API running on http://localhost:${PORT}`));
-  })
-  .catch((err) => {
+  } catch (err) {
     console.error('❌ MongoDB connection error:', err);
-    process.exit(1);
-  });
+    console.log('🔄 Retrying in 10 seconds...');
+    setTimeout(connectDB, 10000);
+  }
+};
+
+connectDB();
