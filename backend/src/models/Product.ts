@@ -7,22 +7,29 @@ export interface IProduct extends Document {
   stock: number;
   category: string;
   image: string;
+  published: boolean;    // ← admin toggles this to show/hide in store
+  source: string;        // 'manual' | 'aliexpress' | 'ebay' | 'import'
+  sourceUrl: string;
+  supplierPrice: number;
   createdAt: Date;
 }
 
 const ProductSchema = new Schema<IProduct>(
   {
-    name: { type: String, required: true, trim: true },
-    description: { type: String, required: true },
-    price: { type: Number, required: true, min: 0 },
-    stock: { type: Number, required: true, default: 0, min: 0 },
-    category: { type: String, required: true },
-    image: { type: String, default: '' },
+    name:         { type: String, required: true, trim: true },
+    description:  { type: String, default: '' },
+    price:        { type: Number, required: true, min: 0 },
+    stock:        { type: Number, required: true, default: 0, min: 0 },
+    category:     { type: String, required: true },
+    image:        { type: String, default: '' },
+    published:    { type: Boolean, default: false }, // imported = draft, admin publishes
+    source:       { type: String, default: 'manual' },
+    sourceUrl:    { type: String, default: '' },
+    supplierPrice:{ type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
-// Text search index
 ProductSchema.index({ name: 'text', description: 'text' });
 
 export const Product = model<IProduct>('Product', ProductSchema);
