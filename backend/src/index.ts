@@ -9,6 +9,7 @@ import productRoutes from './routes/products';
 import orderRoutes from './routes/orders';
 import uploadRoutes from './routes/upload';
 import reviewRoutes from './routes/reviews';
+import scraperRoutes from './routes/scraper';
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/scraper', scraperRoutes);
 
 // Health check — always responds, even without DB
 app.get('/api/health', (_req, res) => {

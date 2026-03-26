@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getOrders, getProducts, getToken } from '@/lib/api';
-import { Package, ShoppingCart, DollarSign, Users, LayoutDashboard, LogOut } from 'lucide-react';
+import { Package, ShoppingCart, LayoutDashboard, LogOut, TrendingUp, Zap } from 'lucide-react';
 
 export function AdminLayout({ children, title }: { children: React.ReactNode; title: string }) {
   const router = useRouter();
@@ -19,6 +19,7 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
     { href: '/admin/dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Dashboard' },
     { href: '/admin/products', icon: <Package className="w-4 h-4" />, label: 'Productos' },
     { href: '/admin/orders', icon: <ShoppingCart className="w-4 h-4" />, label: 'Órdenes' },
+    { href: '/admin/import', icon: <TrendingUp className="w-4 h-4" />, label: 'Importar' },
   ];
 
   return (
