@@ -1,31 +1,121 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import { CreditCard, Lock } from 'lucide-react';
+import { Lock, CreditCard, Truck, CheckCircle, ArrowRight } from 'lucide-react';
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+type Step = 'form' | 'processing' | 'success';
 
 export default function CheckoutPage() {
+  const router = useRouter();
   const { items, total, clearCart } = useCart();
-  const [form, setForm] = useState({ name: '', email: '', street: '', city: '', postal: '', country: 'Chile', card: '', expiry: '', cvv: '' });
-  const [step, setStep] = useState<'form' | 'processing' | 'success'>('form');
+  const [step, setStep] = useState<Step>('form');
+  const [orderId, setOrderId] = useState('');
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '',
+    street: '', city: '', region: '', postal: '', country: 'Chile',
+    card: '', expiry: '', cvv: '',
+  });
+
+  const shipping = total >= 99 ? 0 : 9.99;
+  const finalTotal = total + shipping;
+
+  const field = (label: string, key: keyof typeof form, opts: { type?: string; placeholder?: string; maxLength?: number; mono?: boolean } = {}) => (
+    <div key={key}>
+      <label className="text-xs text-gray-400 mb-1.5 block">{label}</label>
+      <input
+        required type={opts.type || 'text'} placeholder={opts.placeholder || ''} maxLength={opts.maxLength}
+        value={form[key]}
+        onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+        className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none transition-colors ${opts.mono ? 'font-mono' : ''}`}
+      />
+    </div>
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep('processing');
-    // Simulate Stripe payment delay
-    await new Promise(r => setTimeout(r, 2000));
-    clearCart();
-    setStep('success');
+    if (items.length === 0) return;
+    setStep('processing'); setError('');
+
+    try {
+      // 1. Register guest user or get token from localStorage
+      let token = localStorage.getItem('userToken') || localStorage.getItem('adminToken');
+
+      // 2. If no token, register a guest account with the email
+      if (!token) {
+        const regRes = await fetch(`${API}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: form.name,
+            email: form.email,
+            password: `guest_${Date.now()}`, // temp password for guest
+          }),
+        });
+        if (regRes.ok) {
+          const regData = await regRes.json();
+          token = regData.token;
+          localStorage.setItem('userToken', token!);
+        } else {
+          // Try login if already registered
+          const loginRes = await fetch(`${API}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: form.email, password: form.card.slice(-4) }),
+          });
+          if (loginRes.ok) {
+            const loginData = await loginRes.json();
+            token = loginData.token;
+            localStorage.setItem('userToken', token!);
+          }
+        }
+      }
+
+      // 3. Create the order in MongoDB
+      const orderRes = await fetch(`${API}/api/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          items: items.map(i => ({ product: i.id, name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
+          shippingAddress: { name: form.name, street: form.street, city: form.city, region: form.region, postal: form.postal, country: form.country, phone: form.phone },
+          paymentMethod: 'card_simulated',
+          totalAmount: finalTotal,
+        }),
+      });
+
+      if (!orderRes.ok) {
+        const err = await orderRes.json();
+        throw new Error(err.message || 'Error al crear la orden');
+      }
+
+      const order = await orderRes.json();
+      setOrderId(order._id || 'ORD-' + Date.now());
+      clearCart();
+      setStep('success');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al procesar el pago');
+      setStep('form');
+    }
   };
 
   if (step === 'success') {
     return (
       <div className="max-w-lg mx-auto px-4 py-24 text-center">
-        <div className="text-6xl mb-6">✅</div>
-        <h1 className="text-3xl font-bold text-white mb-3">¡Orden Confirmada!</h1>
-        <p className="text-gray-400 mb-2">Tu pago fue procesado exitosamente por Stripe.</p>
-        <p className="text-sm text-gray-500 mb-8">Recibirás un email de confirmación con los detalles del envío.</p>
-        <a href="/" className="btn-primary inline-block">Volver al inicio</a>
+        <div className="w-20 h-20 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <CheckCircle className="w-10 h-10 text-green-400" />
+        </div>
+        <h1 className="text-3xl font-display font-bold text-white mb-3">¡Orden Confirmada!</h1>
+        <p className="text-gray-400 mb-2">Tu orden fue procesada y guardada exitosamente.</p>
+        {orderId && <p className="text-xs text-gray-600 font-mono mb-6">ID: {orderId}</p>}
+        <p className="text-sm text-gray-500 mb-8">Recibirás un correo de confirmación con los detalles del envío.</p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={() => router.push('/')} className="btn-primary">Ir al inicio <ArrowRight className="w-4 h-4" /></button>
+          <button onClick={() => router.push('/products')} className="btn-ghost">Seguir comprando</button>
+        </div>
       </div>
     );
   }
@@ -33,89 +123,105 @@ export default function CheckoutPage() {
   if (step === 'processing') {
     return (
       <div className="max-w-lg mx-auto px-4 py-24 text-center">
-        <div className="text-6xl mb-6 animate-pulse">💳</div>
+        <div className="w-16 h-16 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-8" />
         <h1 className="text-2xl font-bold text-white mb-3">Procesando pago...</h1>
-        <p className="text-gray-400">Por favor espera mientras Stripe verifica tu tarjeta.</p>
-        <div className="mt-8 flex justify-center gap-2">
-          {[0, 1, 2].map(i => (
-            <div key={i} className="w-3 h-3 bg-brand rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-          ))}
-        </div>
+        <p className="text-gray-400">Guardando tu orden en la base de datos.</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-24 text-center">
+        <p className="text-gray-400 mb-4">Tu carrito está vacío.</p>
+        <button onClick={() => router.push('/products')} className="btn-primary">Ver Productos</button>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold text-white mb-8 flex items-center gap-3">
+    <div className="max-w-5xl mx-auto px-4 py-12">
+      <h1 className="text-3xl font-display font-bold text-white mb-2 flex items-center gap-3">
         <Lock className="w-6 h-6 text-green-400" /> Checkout Seguro
       </h1>
+      <p className="text-sm text-gray-500 mb-8">Tu información está protegida con cifrado SSL</p>
 
-      <div className="grid md:grid-cols-3 gap-8">
-        <form onSubmit={handleSubmit} className="md:col-span-2 space-y-6">
+      <div className="grid lg:grid-cols-3 gap-8">
+        <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-5">
           {/* Shipping */}
           <div className="card p-6 space-y-4">
-            <h2 className="font-bold text-white">Información de Envío</h2>
-            {[
-              { label: 'Nombre completo', key: 'name', type: 'text', placeholder: 'Ricardo Sanhueza' },
-              { label: 'Email', key: 'email', type: 'email', placeholder: 'correo@email.com' },
-              { label: 'Dirección', key: 'street', type: 'text', placeholder: 'Calle 123' },
-              { label: 'Ciudad', key: 'city', type: 'text', placeholder: 'Concepción' },
-              { label: 'Código postal', key: 'postal', type: 'text', placeholder: '4030000' },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="text-xs text-gray-400 mb-1 block">{f.label}</label>
-                <input required type={f.type} placeholder={f.placeholder}
-                  value={form[f.key as keyof typeof form]}
-                  onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-brand focus:outline-none" />
+            <h2 className="font-semibold text-white flex items-center gap-2"><Truck className="w-4 h-4 text-indigo-400" /> Información de Envío</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {field('Nombre completo', 'name', { placeholder: 'Ricardo Sanhueza' })}
+              {field('Email', 'email', { type: 'email', placeholder: 'correo@email.com' })}
+            </div>
+            {field('Teléfono', 'phone', { placeholder: '+56 9 1234 5678' })}
+            {field('Dirección', 'street', { placeholder: 'Av. O\'Higgins 1234, Dpto 5' })}
+            <div className="grid grid-cols-2 gap-4">
+              {field('Ciudad', 'city', { placeholder: 'Concepción' })}
+              {field('Región', 'region', { placeholder: 'Biobío' })}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {field('Código Postal', 'postal', { placeholder: '4030000' })}
+              <div>
+                <label className="text-xs text-gray-400 mb-1.5 block">País</label>
+                <select value={form.country} onChange={e => setForm(p => ({ ...p, country: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                  {['Chile', 'Argentina', 'Colombia', 'México', 'Perú', 'España'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
-            ))}
+            </div>
           </div>
 
           {/* Payment */}
           <div className="card p-6 space-y-4">
-            <h2 className="font-bold text-white flex items-center gap-2"><CreditCard className="w-4 h-4" /> Datos de Pago (Stripe)</h2>
-            <div>
-              <label className="text-xs text-gray-400 mb-1 block">Número de tarjeta</label>
-              <input required placeholder="4242 4242 4242 4242" maxLength={19}
-                value={form.card} onChange={e => setForm(p => ({ ...p, card: e.target.value }))}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-brand focus:outline-none font-mono" />
-            </div>
+            <h2 className="font-semibold text-white flex items-center gap-2"><CreditCard className="w-4 h-4 text-indigo-400" /> Datos de Pago</h2>
+            {field('Número de tarjeta', 'card', { placeholder: '4242 4242 4242 4242', maxLength: 19, mono: true })}
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Expiración</label>
-                <input required placeholder="MM/AA" maxLength={5}
-                  value={form.expiry} onChange={e => setForm(p => ({ ...p, expiry: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-brand focus:outline-none font-mono" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">CVV</label>
-                <input required placeholder="123" maxLength={4}
-                  value={form.cvv} onChange={e => setForm(p => ({ ...p, cvv: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-brand focus:outline-none font-mono" />
-              </div>
+              {field('Expiración', 'expiry', { placeholder: 'MM/AA', maxLength: 5, mono: true })}
+              {field('CVV', 'cvv', { placeholder: '123', maxLength: 4, mono: true })}
             </div>
-            <p className="text-xs text-gray-500 flex items-center gap-1"><Lock className="w-3 h-3" /> Usa 4242 4242 4242 4242 para simular el pago (test mode)</p>
+            <p className="text-xs text-gray-600 flex items-center gap-1.5">
+              <Lock className="w-3 h-3" /> Usa <span className="font-mono text-gray-500">4242 4242 4242 4242</span> para probar (modo test)
+            </p>
           </div>
 
-          <button type="submit" className="btn-primary w-full text-base py-4 flex items-center justify-center gap-2">
-            <Lock className="w-4 h-4" /> Pagar ${total.toLocaleString()}
+          {error && <div className="card p-4 text-red-400 text-sm border-red-500/20 bg-red-500/5">{error}</div>}
+
+          <button type="submit" className="btn-primary w-full py-4 text-base shadow-2xl shadow-indigo-900/40">
+            <Lock className="w-4 h-4" /> Confirmar Orden — ${finalTotal.toFixed(2)}
           </button>
         </form>
 
-        {/* Order summary */}
-        <div className="card p-6 h-fit space-y-3">
-          <h3 className="font-bold text-white">Tu Orden</h3>
-          {items.map(item => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span className="text-gray-400 truncate">{item.image} {item.name} ×{item.quantity}</span>
-              <span className="text-white shrink-0 ml-2">${(item.price * item.quantity).toLocaleString()}</span>
-            </div>
-          ))}
-          <div className="border-t border-gray-800 pt-3 flex justify-between font-bold text-white">
-            <span>Total</span>
-            <span className="text-brand">${total.toLocaleString()}</span>
+        {/* Order Summary */}
+        <div className="card p-6 space-y-4 h-fit sticky top-20">
+          <h3 className="font-semibold text-white">Tu Orden</h3>
+          <div className="space-y-3 max-h-52 overflow-y-auto pr-1">
+            {items.map(item => (
+              <div key={item.id} className="flex items-center gap-3 text-sm">
+                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center shrink-0 overflow-hidden">
+                  {item.image?.startsWith('http') ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <span>{item.image || '📦'}</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-white text-xs truncate">{item.name}</div>
+                  <div className="text-gray-500 text-xs">×{item.quantity}</div>
+                </div>
+                <div className="text-white font-mono text-xs shrink-0">${(item.price * item.quantity).toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+          <div className="h-px bg-white/[0.06]" />
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-gray-400"><span>Subtotal</span><span>${total.toFixed(2)}</span></div>
+            <div className="flex justify-between text-gray-400"><span>Envío</span><span className={shipping === 0 ? 'text-green-400' : ''}>{shipping === 0 ? 'Gratis' : `$${shipping}`}</span></div>
+          </div>
+          <div className="flex justify-between font-bold text-white">
+            <span>Total</span><span className="text-indigo-400 text-lg">${finalTotal.toFixed(2)}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center pt-2">
+            {['🔒 SSL', '↩️ 30d', '📦 Rápido'].map(t => (
+              <div key={t} className="text-[10px] text-gray-600">{t}</div>
+            ))}
           </div>
         </div>
       </div>
