@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { chromium } from 'playwright';
 
 export interface ScrapedProduct {
   name: string;
@@ -9,139 +10,230 @@ export interface ScrapedProduct {
   category: string;
   supplierPrice: number;
   margin: number;
-  demandScore: number;  // 1-10
+  demandScore: number;
   competitionLevel: 'low' | 'medium' | 'high';
   trend: 'rising' | 'stable' | 'declining';
   source: string;
   sourceUrl: string;
 }
 
-// Map search query keywords to our store categories
 function guessCategory(name: string): string {
-  const lower = name.toLowerCase();
-  if (/(laptop|notebook|macbook|ideapad|thinkpad|rog|zenbook)/i.test(lower)) return 'Laptops';
-  if (/(phone|iphone|samsung|xiaomi|pixel|smartphone)/i.test(lower)) return 'Phones';
-  if (/(headphone|earphone|airpods|earbuds|speaker|audio|sound)/i.test(lower)) return 'Audio';
-  if (/(tablet|ipad|surface|galaxy tab)/i.test(lower)) return 'Tablets';
-  if (/(watch|band|fitbit|garmin|wearable)/i.test(lower)) return 'Wearables';
-  if (/(monitor|display|screen|4k|oled)/i.test(lower)) return 'Monitors';
+  const t = name.toLowerCase();
+  if (/(laptop|notebook|macbook|ideapad|thinkpad|chromebook|gaming pc)/i.test(t)) return 'Laptops';
+  if (/(phone|iphone|samsung|xiaomi|pixel|smartphone|mobile)/i.test(t)) return 'Phones';
+  if (/(headphone|earphone|airpod|earbud|speaker|headset|audio|sound)/i.test(t)) return 'Audio';
+  if (/(tablet|ipad|surface|galaxy tab|drawing pad)/i.test(t)) return 'Tablets';
+  if (/(watch|band|fitbit|garmin|wearable|smartwatch|fitness)/i.test(t)) return 'Wearables';
+  if (/(monitor|display|screen|4k oled|curved screen)/i.test(t)) return 'Monitors';
   return 'Accessories';
 }
 
-// Estimate retail margin for a product category
 function estimateMargin(category: string): number {
-  const margins: Record<string, number> = {
-    Laptops: 18, Phones: 22, Audio: 45, Tablets: 25,
-    Wearables: 40, Monitors: 30, Accessories: 55,
-  };
-  return margins[category] ?? 35;
+  return { Laptops: 18, Phones: 22, Audio: 45, Tablets: 25, Wearables: 40, Monitors: 30, Accessories: 55 }[category] ?? 35;
 }
 
-// Estimate demand score based on price range and category
-function estimateDemand(price: number, category: string): number {
-  if (price < 30) return 9;
-  if (price < 80) return 8;
-  if (price < 200) return 7;
-  if (price < 500) return 5;
-  return 3;
-}
+function estimateDemand(score: number): number { return Math.round(Math.max(1, Math.min(10, score))); }
 
 /**
- * Scrape AliExpress search results using cheerio (no browser required)
- * Falls back to generated demo data if scraping is blocked
+ * Strategy 1: Scrape AliExpress with headless Playwright browser
  */
-export async function scrapeAliExpress(query: string, limit = 12): Promise<ScrapedProduct[]> {
-  const url = `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(query)}&SortType=best_match`;
+async function scrapeAliExpressPlaywright(query: string, limit: number): Promise<ScrapedProduct[]> {
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    locale: 'en-US',
+  });
+  const page = await context.newPage();
+  const products: ScrapedProduct[] = [];
 
   try {
-    const { data } = await axios.get(url, {
-      timeout: 12000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      },
+    await page.goto(`https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(query)}&SortType=best_match`, {
+      waitUntil: 'domcontentloaded', timeout: 20000,
     });
+    await page.waitForTimeout(3000);
 
-    const $ = cheerio.load(data);
-    const products: ScrapedProduct[] = [];
+    // Try to extract JSON from the search results embedded in HTML
+    const content = await page.content();
+    const $ = cheerio.load(content);
 
-    // Try multiple selectors (AliExpress changes layout periodically)
-    $('[class*="product-card"], [class*="item-card"], article[data-product-id]').each((_, el) => {
+    $('[class*="product-card"], [class*="search-item"], [data-spm*="item"]').each((_, el) => {
       if (products.length >= limit) return false;
+      const name = $(el).find('[class*="title"], [class*="name"]').first().text().trim();
+      const priceEl = $(el).find('[class*="price"]').first().text();
+      const priceNum = parseFloat(priceEl.replace(/[^0-9.]/g, ''));
+      const img = $(el).find('img').first().attr('src') || $(el).find('img').first().attr('data-src') || '';
+      const href = $(el).find('a[href*="aliexpress"]').first().attr('href') || $(el).find('a').first().attr('href') || '';
 
-      const name = $(el).find('[class*="product-title"], [class*="title"]').first().text().trim();
-      const priceText = $(el).find('[class*="price"]').first().text().replace(/[^0-9.]/g, '');
-      const image = $(el).find('img').first().attr('src') || $(el).find('img').first().attr('data-src') || '';
-      const href = $(el).find('a').first().attr('href') || '';
-
-      if (!name || !priceText) return;
-
-      const price = parseFloat(priceText);
-      if (isNaN(price) || price <= 0) return;
-
+      if (!name || isNaN(priceNum) || priceNum <= 0) return;
       const category = guessCategory(name);
-      const supplierPrice = price * 0.35;
-      const margin = estimateMargin(category);
-
       products.push({
-        name: name.substring(0, 100),
-        price: Math.round(price * 100) / 100,
-        image: image.startsWith('//') ? `https:${image}` : image,
-        description: `${name}. Producto importado de AliExpress con análisis de mercado automático.`,
+        name: name.slice(0, 120),
+        price: Math.round(priceNum * 100) / 100,
+        image: img.startsWith('//') ? `https:${img}` : img,
+        description: `${name}. Encontrado en AliExpress.`,
         category,
-        supplierPrice: Math.round(supplierPrice * 100) / 100,
-        margin,
-        demandScore: estimateDemand(price, category),
-        competitionLevel: price < 50 ? 'high' : price < 200 ? 'medium' : 'low',
+        supplierPrice: Math.round(priceNum * 0.33 * 100) / 100,
+        margin: estimateMargin(category),
+        demandScore: estimateDemand(8 - products.length * 0.5),
+        competitionLevel: priceNum < 30 ? 'high' : priceNum < 150 ? 'medium' : 'low',
         trend: 'stable',
         source: 'AliExpress',
         sourceUrl: href.startsWith('http') ? href : `https://www.aliexpress.com${href}`,
       });
     });
-
-    if (products.length > 0) return products;
-  } catch (err) {
-    console.warn('AliExpress scrape failed (possibly blocked), using generated data:', (err as Error).message);
+  } finally {
+    await browser.close();
   }
-
-  // ── Fallback: AI-generated product research based on query ──────────
-  return generateResearchResults(query, limit);
+  return products;
 }
 
 /**
- * Generate realistic product research results when scraping is blocked.
- * Uses query context to simulate product discovery as the skill describes.
+ * Strategy 2: Scrape eBay with Playwright (more reliable, less anti-bot)
  */
-function generateResearchResults(query: string, limit: number): ScrapedProduct[] {
-  const category = guessCategory(query);
-  const baseProducts = [
-    { name: `${query} Pro Premium`, price: 89.99, multiplier: 0.28 },
-    { name: `${query} Wireless`, price: 49.99, multiplier: 0.25 },
-    { name: `${query} Ultra Slim`, price: 129.99, multiplier: 0.30 },
-    { name: `${query} Portable`, price: 34.99, multiplier: 0.22 },
-    { name: `${query} Gaming Edition`, price: 159.99, multiplier: 0.32 },
-    { name: `${query} Budget Series`, price: 24.99, multiplier: 0.20 },
-    { name: `${query} Deluxe Set`, price: 79.99, multiplier: 0.27 },
-    { name: `${query} Mini`, price: 19.99, multiplier: 0.18 },
-    { name: `${query} Professional`, price: 219.99, multiplier: 0.35 },
-    { name: `${query} Starter Kit`, price: 44.99, multiplier: 0.24 },
-    { name: `${query} Advanced`, price: 99.99, multiplier: 0.29 },
-    { name: `${query} Compact`, price: 59.99, multiplier: 0.26 },
-  ];
+async function scrapeEbayPlaywright(query: string, limit: number): Promise<ScrapedProduct[]> {
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  });
+  const page = await context.newPage();
+  const products: ScrapedProduct[] = [];
 
-  return baseProducts.slice(0, limit).map((p, i) => ({
-    name: p.name,
-    price: p.price,
-    image: '',
-    description: `${p.name} — alta demanda en ${category}. Producto validado por el análisis de mercado.`,
-    category,
-    supplierPrice: Math.round(p.price * p.multiplier * 100) / 100,
-    margin: estimateMargin(category),
-    demandScore: Math.max(4, 10 - i),
-    competitionLevel: i < 3 ? 'low' : i < 7 ? 'medium' : 'high',
-    trend: i < 4 ? 'rising' : 'stable',
-    source: 'Research',
-    sourceUrl: `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(p.name)}`,
-  }));
+  try {
+    await page.goto(`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_sop=12&LH_BIN=1`, {
+      waitUntil: 'domcontentloaded', timeout: 20000,
+    });
+    await page.waitForTimeout(2000);
+
+    const content = await page.content();
+    const $ = cheerio.load(content);
+
+    $('.s-item').each((_, el) => {
+      if (products.length >= limit) return false;
+      const name = $(el).find('.s-item__title').text().trim().replace('Shop on eBay', '').trim();
+      const priceText = $(el).find('.s-item__price').first().text().trim();
+      const priceNum = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+      const img = $(el).find('.s-item__image-img').attr('src') || '';
+      const href = $(el).find('a.s-item__link').attr('href') || '';
+      const condition = $(el).find('.SECONDARY_INFO').text().trim();
+
+      if (!name || name.length < 5 || isNaN(priceNum) || priceNum <= 0) return;
+      const category = guessCategory(name);
+      // eBay prices are closer to retail — estimate supplier at 35-50% of retail
+      const supplierPrice = Math.round(priceNum * 0.38 * 100) / 100;
+
+      products.push({
+        name: name.slice(0, 120),
+        price: Math.round(priceNum * 100) / 100,
+        image: img,
+        description: `${name}${condition ? ` — ${condition}` : ''}. Fuente: eBay.`,
+        category,
+        supplierPrice,
+        margin: estimateMargin(category),
+        demandScore: estimateDemand(7 - products.length * 0.4),
+        competitionLevel: priceNum < 50 ? 'high' : priceNum < 200 ? 'medium' : 'low',
+        trend: 'stable',
+        source: 'eBay',
+        sourceUrl: href,
+      });
+    });
+  } finally {
+    await browser.close();
+  }
+  return products;
+}
+
+/**
+ * Strategy 3: Lightweight cheerio scrape of eBay (no browser, faster)
+ */
+async function scrapeEbayCheerio(query: string, limit: number): Promise<ScrapedProduct[]> {
+  const url = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_sop=12&LH_BIN=1`;
+  const { data } = await axios.get(url, {
+    timeout: 15000,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept': 'text/html,application/xhtml+xml',
+    },
+  });
+
+  const $ = cheerio.load(data);
+  const products: ScrapedProduct[] = [];
+
+  $('.s-item').each((_, el) => {
+    if (products.length >= limit) return false;
+    const name = $(el).find('.s-item__title').text().trim().replace('Shop on eBay', '').trim();
+    const priceText = $(el).find('.s-item__price').first().text().trim();
+    const priceNum = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+    const img = $(el).find('.s-item__image-img').attr('src') || '';
+    const href = $(el).find('a.s-item__link').attr('href') || '';
+
+    if (!name || name.length < 5 || isNaN(priceNum) || priceNum <= 0) return;
+    const category = guessCategory(name);
+
+    products.push({
+      name: name.slice(0, 120),
+      price: Math.round(priceNum * 100) / 100,
+      image: img,
+      description: `${name}. Fuente: eBay Marketplace.`,
+      category,
+      supplierPrice: Math.round(priceNum * 0.38 * 100) / 100,
+      margin: estimateMargin(category),
+      demandScore: estimateDemand(7 - products.length * 0.3),
+      competitionLevel: priceNum < 50 ? 'high' : priceNum < 200 ? 'medium' : 'low',
+      trend: 'stable',
+      source: 'eBay',
+      sourceUrl: href,
+    });
+  });
+
+  return products;
+}
+
+/**
+ * Main export: tries sources in cascade order
+ * 1. AliExpress via Playwright
+ * 2. eBay via cheerio (fast, reliable)
+ * 3. eBay via Playwright (JS-rendered)
+ */
+export async function scrapeProducts(query: string, limit = 12): Promise<ScrapedProduct[]> {
+  console.log(`🔍 Scraping "${query}" — limit ${limit}`);
+
+  // Try AliExpress with Playwright first
+  try {
+    console.log('  → Trying AliExpress (Playwright)...');
+    const results = await scrapeAliExpressPlaywright(query, limit);
+    if (results.length >= 3) {
+      console.log(`  ✅ AliExpress: ${results.length} products found`);
+      return results;
+    }
+    console.log(`  ⚠️ AliExpress: only ${results.length} results, trying eBay...`);
+  } catch (e) {
+    console.warn('  ❌ AliExpress Playwright failed:', (e as Error).message);
+  }
+
+  // Fallback 1: eBay via fast cheerio
+  try {
+    console.log('  → Trying eBay (cheerio)...');
+    const results = await scrapeEbayCheerio(query, limit);
+    if (results.length >= 3) {
+      console.log(`  ✅ eBay cheerio: ${results.length} products found`);
+      return results;
+    }
+  } catch (e) {
+    console.warn('  ❌ eBay cheerio failed:', (e as Error).message);
+  }
+
+  // Fallback 2: eBay via Playwright
+  try {
+    console.log('  → Trying eBay (Playwright)...');
+    const results = await scrapeEbayPlaywright(query, limit);
+    if (results.length > 0) {
+      console.log(`  ✅ eBay Playwright: ${results.length} products found`);
+      return results;
+    }
+  } catch (e) {
+    console.warn('  ❌ eBay Playwright failed:', (e as Error).message);
+  }
+
+  throw new Error('All scraping sources failed. Check network access or try a different query.');
 }
