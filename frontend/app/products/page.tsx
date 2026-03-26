@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { Search, SlidersHorizontal, ShoppingCart, Check, Star } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
@@ -13,7 +13,7 @@ const EMOJI: Record<string, string> = { Laptops: '💻', Phones: '📱', Audio: 
 
 interface Product { _id: string; name: string; price: number; image: string; category: string; description: string; stock: number; supplierPrice?: number }
 
-export default function ProductsPage() {
+function ProductsContent() {
   const { addItem } = useCart();
   const router = useRouter();
   const params = useSearchParams();
@@ -155,5 +155,13 @@ export default function ProductsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-24"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
+      <ProductsContent />
+    </Suspense>
   );
 }
