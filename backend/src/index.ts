@@ -7,6 +7,9 @@ import mongoose from 'mongoose';
 import authRoutes from './routes/auth';
 import productRoutes from './routes/products';
 import orderRoutes from './routes/orders';
+import uploadRoutes from './routes/upload';
+import reviewRoutes from './routes/reviews';
+
 
 dotenv.config();
 
@@ -22,6 +25,8 @@ app.use(morgan('dev'));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

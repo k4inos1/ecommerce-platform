@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createProduct, deleteProduct, getProducts, getToken, updateProduct } from '@/lib/api';
 import { AdminLayout } from '@/components/ui/AdminLayout';
+import { ImageUploader } from '@/components/ui/ImageUploader';
 import { Plus, Pencil, Trash2, X, Check } from 'lucide-react';
 
 interface Product { _id: string; name: string; description: string; price: number; stock: number; category: string; image: string }
@@ -79,7 +80,6 @@ export default function AdminProducts() {
                 {[
                   { label: 'Nombre', key: 'name', type: 'text', placeholder: 'MacBook Pro M3' },
                   { label: 'Descripción', key: 'description', type: 'text', placeholder: 'Descripción del producto...' },
-                  { label: 'Imagen URL', key: 'image', type: 'url', placeholder: 'https://...' },
                 ].map(f => (
                   <div key={f.key}>
                     <label className="text-xs text-gray-400 mb-1 block">{f.label}</label>
@@ -89,6 +89,7 @@ export default function AdminProducts() {
                       className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-brand focus:outline-none" />
                   </div>
                 ))}
+                <ImageUploader value={form.image} onChange={url => setForm(p => ({ ...p, image: url }))} />
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-gray-400 mb-1 block">Precio ($)</label>
