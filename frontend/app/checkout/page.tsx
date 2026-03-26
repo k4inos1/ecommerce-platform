@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import { Lock, CreditCard, Truck, CheckCircle, ArrowRight } from 'lucide-react';
+import { Lock, CreditCard, Truck, CheckCircle, ArrowRight, ExternalLink } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -23,6 +23,48 @@ export default function CheckoutPage() {
 
   const shipping = total >= 99 ? 0 : 9.99;
   const finalTotal = total + shipping;
+  const [stripeLoading, setStripeLoading] = useState(false);
+
+  // ── Stripe Checkout: save order then redirect to Stripe ──────────────
+  const handleStripeCheckout = async () => {
+    if (items.length === 0 || !form.name || !form.email) {
+      alert('Por favor completa nombre y email antes de pagar con Stripe.');
+      return;
+    }
+    setStripeLoading(true);
+    try {
+      let token = localStorage.getItem('userToken') || localStorage.getItem('adminToken');
+      if (!token) {
+        const res = await fetch(`${API}/api/auth/register`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.name, email: form.email, password: `guest_${Date.now()}` }),
+        });
+        if (res.ok) { const d = await res.json(); token = d.token; localStorage.setItem('userToken', token!); }
+      }
+      // 1. Create order in DB (status = pending)
+      const orderRes = await fetch(`${API}/api/orders`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          items: items.map(i => ({ product: i.id, name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
+          shippingAddress: { name: form.name, street: form.street, city: form.city, region: form.region, postal: form.postal, country: form.country, phone: form.phone },
+          paymentMethod: 'stripe',
+          totalAmount: finalTotal,
+        }),
+      });
+      const order = await orderRes.json();
+      // 2. Create Stripe Checkout Session
+      const sessionRes = await fetch(`${API}/api/stripe/checkout-session`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ items: items.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, image: i.image })), orderId: order._id }),
+      });
+      const { url } = await sessionRes.json();
+      if (url) { clearCart(); window.location.href = url; }
+      else throw new Error('No Stripe URL returned');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error con Stripe');
+      setStripeLoading(false);
+    }
+  };
 
   const field = (label: string, key: keyof typeof form, opts: { type?: string; placeholder?: string; maxLength?: number; mono?: boolean } = {}) => (
     <div key={key}>
@@ -218,7 +260,15 @@ export default function CheckoutPage() {
           <div className="flex justify-between font-bold text-white">
             <span>Total</span><span className="text-indigo-400 text-lg">${finalTotal.toFixed(2)}</span>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center pt-2">
+          {/* Stripe Checkout */}
+          <button onClick={handleStripeCheckout} disabled={stripeLoading}
+            className="w-full py-3.5 rounded-xl font-semibold text-sm bg-[#635bff] hover:bg-[#4f46e5] text-white transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#635bff]/30 disabled:opacity-60">
+            {stripeLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>💳 Pagar con Stripe</>}
+          </button>
+          <div className="flex items-center gap-3 text-gray-600 text-xs">
+            <div className="flex-1 h-px bg-white/[0.05]" />o continúa con el formulario<div className="flex-1 h-px bg-white/[0.05]" />
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
             {['🔒 SSL', '↩️ 30d', '📦 Rápido'].map(t => (
               <div key={t} className="text-[10px] text-gray-600">{t}</div>
             ))}

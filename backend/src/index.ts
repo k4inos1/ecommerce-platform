@@ -10,6 +10,7 @@ import orderRoutes from './routes/orders';
 import uploadRoutes from './routes/upload';
 import reviewRoutes from './routes/reviews';
 import scraperRoutes from './routes/scraper';
+import stripeRoutes from './routes/stripe';
 
 dotenv.config();
 
@@ -29,6 +30,8 @@ app.use(cors({
   },
   credentials: true,
 }));
+// Stripe webhook needs raw body BEFORE express.json()
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -39,6 +42,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/scraper', scraperRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 // Health check — always responds, even without DB
 app.get('/api/health', (_req, res) => {

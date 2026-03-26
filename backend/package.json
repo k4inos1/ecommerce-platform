@@ -1,7 +1,9 @@
 {
   "name": "ecommerce-backend",
   "version": "1.0.0",
-  "engines": { "node": ">=20.0.0" },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "description": "REST API for E-Commerce Platform - Node.js + Express + MongoDB",
   "main": "dist/index.js",
   "scripts": {
@@ -11,6 +13,7 @@
   },
   "dependencies": {
     "@types/multer": "^2.1.0",
+    "@types/nodemailer": "^7.0.11",
     "axios": "^1.13.6",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.2.0",
@@ -22,9 +25,11 @@
     "mongoose": "^8.4.0",
     "morgan": "^1.10.0",
     "multer": "^2.1.1",
+    "nodemailer": "^8.0.4",
     "p-limit": "^7.3.0",
     "playwright": "^1.58.2",
-    "puppeteer-core": "^24.40.0"
+    "puppeteer-core": "^24.40.0",
+    "stripe": "^21.0.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
