@@ -74,3 +74,45 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
 
   console.log(`📧 Confirmation email sent to ${data.to}`);
 }
+
+export async function sendWelcomeEmail(to: string, name: string) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log('📧 Welcome email skipped — EMAIL_USER/EMAIL_PASS not configured');
+    return;
+  }
+
+  const html = `
+  <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+  <body style="background:#0a0a14;font-family:Inter,sans-serif;margin:0;padding:20px">
+    <div style="max-width:520px;margin:0 auto;background:#0f0f1a;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
+      <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:40px 32px;text-align:center">
+        <div style="font-size:40px;margin-bottom:12px">👋</div>
+        <h1 style="color:#fff;margin:0;font-size:26px">¡Bienvenido a TechStore!</h1>
+      </div>
+      <div style="padding:32px 28px;text-align:center;">
+        <p style="color:#cbd5e1;font-size:16px;line-height:1.6;margin:0 0 24px">
+          Hola <strong>${name}</strong>,<br><br>
+          Tu cuenta ha sido creada exitosamente. Ya estás listo para explorar nuestro catálogo de productos tecnológicos y realizar compras seguras.
+        </p>
+        <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/products" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:bold;font-size:15px">
+          Ver Catálogo
+        </a>
+        <p style="color:#6b7280;font-size:13px;margin:32px 0 0">
+          Si tienes alguna duda, responde a este correo y te ayudaremos con gusto.
+        </p>
+      </div>
+      <div style="padding:16px;text-align:center;border-top:1px solid rgba(255,255,255,0.05)">
+        <p style="color:#374151;font-size:11px;margin:0">TechStore · La mejor tecnología al alcance de tu mano</p>
+      </div>
+    </div>
+  </body></html>`;
+
+  await transporter.sendMail({
+    from: `"TechStore" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `¡Bienvenido a TechStore, ${name}! 🎉`,
+    html,
+  });
+
+  console.log(`📧 Welcome email sent to ${to}`);
+}
