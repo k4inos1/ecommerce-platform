@@ -1,26 +1,43 @@
 import { Router, Response } from 'express';
 import { Order } from '../models/Order';
 import { protect, adminOnly, AuthRequest } from '../middleware/auth';
+import { sendOrderConfirmation } from '../services/email';
+import { User } from '../models/User';
 
 const router = Router();
 
 // POST /api/orders - Create order (authenticated users)
 router.post('/', protect, async (req: AuthRequest, res: Response) => {
   try {
-    const { items, shippingAddress } = req.body;
+    const { items, shippingAddress, paymentMethod, totalAmount } = req.body;
     if (!items?.length) return res.status(400).json({ message: 'No order items' });
 
-    const totalAmount = items.reduce(
-      (sum: number, item: { price: number; quantity: number }) => sum + item.price * item.quantity,
-      0
+    const calculatedTotal = totalAmount || items.reduce(
+      (sum: number, item: { price: number; quantity: number }) => sum + item.price * item.quantity, 0
     );
 
     const order = await Order.create({
       user: req.user!.id,
       items,
-      totalAmount,
+      totalAmount: calculatedTotal,
       shippingAddress,
+      paymentMethod: paymentMethod || 'card',
     });
+
+    // Send confirmation email async (don't block response)
+    try {
+      const user = await User.findById(req.user!.id).select('email name');
+      if (user?.email) {
+        sendOrderConfirmation({
+          to: user.email,
+          customerName: user.name || shippingAddress?.name || 'Cliente',
+          orderId: String(order._id),
+          items,
+          totalAmount: calculatedTotal,
+          shippingAddress,
+        }).catch(e => console.warn('Email failed:', e.message));
+      }
+    } catch { /* silent */ }
 
     res.status(201).json(order);
   } catch (err) {
