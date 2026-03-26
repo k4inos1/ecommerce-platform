@@ -4,7 +4,7 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // Gmail App Password (not your regular password)
+    pass: process.env.EMAIL_PASS,
   },
 });
 
@@ -17,6 +17,28 @@ interface OrderEmailData {
   shippingAddress?: { street?: string; city?: string; country?: string };
 }
 
+// Estilos corporativos base
+const corporateStyle = `
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; color: #1f2937; line-height: 1.6; }
+  .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+  .banner { width: 100%; height: 180px; object-fit: cover; display: block; border-bottom: 4px solid #4f46e5; }
+  .header { padding: 30px; text-align: center; background-color: #ffffff; }
+  .logo { font-size: 28px; font-weight: 800; color: #111827; letter-spacing: -0.5px; margin: 0 0 10px; }
+  .logo span { color: #4f46e5; }
+  .content { padding: 0 40px 40px; }
+  .greeting { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 15px; }
+  .text { font-size: 15px; color: #4b5563; margin-bottom: 25px; }
+  .button { display: inline-block; background-color: #4f46e5; color: #ffffff !important; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .footer { background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb; }
+  .footer p { font-size: 12px; color: #9ca3af; margin: 0; padding: 0; }
+  .table { width: 100%; border-collapse: collapse; margin-top: 20px; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; }
+  .table th { background-color: #f9fafb; text-align: left; padding: 12px 15px; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+  .table td { padding: 15px; border-top: 1px solid #e5e7eb; font-size: 14px; }
+  .total-row { background-color: #f9fafb; font-weight: 700; color: #111827; }
+  .address-box { background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; margin-top: 25px; }
+  .address-box strong { display: block; margin-bottom: 5px; color: #374151; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;}
+`;
+
 export async function sendOrderConfirmation(data: OrderEmailData) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.log('📧 Email skipped — EMAIL_USER/EMAIL_PASS not configured');
@@ -24,55 +46,57 @@ export async function sendOrderConfirmation(data: OrderEmailData) {
   }
 
   const itemRows = data.items.map(i =>
-    `<tr><td style="padding:8px 12px;color:#cbd5e1">${i.name} ×${i.quantity}</td><td style="padding:8px 12px;text-align:right;color:#fff;font-family:monospace">$${(i.price * i.quantity).toFixed(2)}</td></tr>`
+    `<tr>
+      <td style="color:#374151">${i.name} <span style="color:#9ca3af;font-size:12px">×${i.quantity}</span></td>
+      <td style="text-align:right;color:#111827;font-weight:500">$${(i.price * i.quantity).toFixed(2)}</td>
+    </tr>`
   ).join('');
 
   const html = `
-  <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-  <body style="background:#0a0a14;font-family:Inter,sans-serif;margin:0;padding:20px">
-    <div style="max-width:520px;margin:0 auto;background:#0f0f1a;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
-      <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:32px;text-align:center">
-        <div style="font-size:32px;margin-bottom:8px">⚡</div>
-        <h1 style="color:#fff;margin:0;font-size:22px">¡Orden Confirmada!</h1>
-        <p style="color:rgba(255,255,255,0.7);margin:8px 0 0">Gracias por tu compra, ${data.customerName}</p>
+  <!DOCTYPE html><html><head><meta charset="UTF-8"><style>${corporateStyle}</style></head>
+  <body>
+    <div class="container">
+      <!-- Banner Premium Corporativo (Unsplash Tech) -->
+      <img src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=600&h=180" class="banner" alt="TechStore Banner" />
+      <div class="header">
+        <div class="logo">Tech<span>Store</span></div>
+        <div style="font-size:14px;color:#6b7280;letter-spacing:1px;text-transform:uppercase;font-weight:600">Comprobante de Orden</div>
       </div>
-      <div style="padding:28px">
-        <p style="color:#6b7280;font-size:12px;font-family:monospace;margin:0 0 20px">
-          ID de orden: <span style="color:#818cf8">#${String(data.orderId).slice(-8).toUpperCase()}</span>
-        </p>
-        <table style="width:100%;border-collapse:collapse;background:rgba(255,255,255,0.03);border-radius:10px;overflow:hidden;margin-bottom:20px">
-          <thead><tr style="background:rgba(255,255,255,0.05)">
-            <th style="padding:10px 12px;text-align:left;color:#6b7280;font-size:11px;text-transform:uppercase">Producto</th>
-            <th style="padding:10px 12px;text-align:right;color:#6b7280;font-size:11px;text-transform:uppercase">Total</th>
-          </tr></thead>
+      <div class="content">
+        <div class="greeting">¡Gracias por tu compra, ${data.customerName}!</div>
+        <p class="text">Hemos recibido tu orden y ya estamos preparándola para el envío. A continuación encontrarás el resumen detallado de tu transacción corporativa.</p>
+        
+        <p style="font-size:13px;color:#6b7280;margin:0 0 10px">ID de Orden Ref: <strong style="color:#4f46e5">#${String(data.orderId).slice(-8).toUpperCase()}</strong></p>
+        
+        <table class="table">
+          <thead><tr><th>Descripción</th><th style="text-align:right">Subtotal</th></tr></thead>
           <tbody>${itemRows}</tbody>
-          <tfoot><tr style="border-top:1px solid rgba(255,255,255,0.07)">
-            <td style="padding:12px;color:#fff;font-weight:bold">Total</td>
-            <td style="padding:12px;text-align:right;color:#818cf8;font-weight:bold;font-family:monospace;font-size:16px">$${data.totalAmount.toFixed(2)}</td>
-          </tr></tfoot>
+          <tfoot><tr class="total-row"><td>Total a Pagar</td><td style="text-align:right;color:#4f46e5;font-size:16px">$${data.totalAmount.toFixed(2)}</td></tr></tfoot>
         </table>
-        ${data.shippingAddress ? `<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:14px;margin-bottom:20px">
-          <p style="color:#6b7280;font-size:11px;text-transform:uppercase;margin:0 0 6px">Dirección de envío</p>
-          <p style="color:#cbd5e1;font-size:14px;margin:0">${data.shippingAddress.street || ''}, ${data.shippingAddress.city || ''}, ${data.shippingAddress.country || ''}</p>
+
+        ${data.shippingAddress ? `<div class="address-box">
+          <strong>Dirección de Despacho Logístico</strong>
+          <span style="color:#4b5563;font-size:14px">${data.shippingAddress.street || ''}, ${data.shippingAddress.city || ''}, ${data.shippingAddress.country || ''}</span>
         </div>` : ''}
-        <p style="color:#6b7280;font-size:13px;text-align:center;margin:0">
-          Recibirás una actualización cuando tu pedido sea enviado.
-        </p>
+        
+        <div style="text-align:center;margin-top:35px">
+          <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/mis-ordenes" class="button">Rastrear mi orden</a>
+        </div>
       </div>
-      <div style="padding:16px;text-align:center;border-top:1px solid rgba(255,255,255,0.05)">
-        <p style="color:#374151;font-size:11px;margin:0">TechStore · Pagos seguros con Stripe SSL</p>
+      <div class="footer">
+        <p>TechStore Retail Group | Av. Providencia 1234, Santiago, Chile</p>
+        <p style="margin-top:8px">Este es un correo automático oficial. Por favor no responder a este mensaje.</p>
       </div>
     </div>
   </body></html>`;
 
   await transporter.sendMail({
-    from: `"TechStore" <${process.env.EMAIL_USER}>`,
+    from: `"TechStore Corporativo" <${process.env.EMAIL_USER}>`,
     to: data.to,
-    subject: `✅ Orden confirmada #${String(data.orderId).slice(-8).toUpperCase()} — TechStore`,
+    subject: `Recibo Oficial - Orden #${String(data.orderId).slice(-8).toUpperCase()} | TechStore`,
     html,
   });
-
-  console.log(`📧 Confirmation email sent to ${data.to}`);
+  console.log(`📧 Corporate confirmation email sent to ${data.to}`);
 }
 
 export async function sendWelcomeEmail(to: string, name: string) {
@@ -82,37 +106,35 @@ export async function sendWelcomeEmail(to: string, name: string) {
   }
 
   const html = `
-  <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-  <body style="background:#0a0a14;font-family:Inter,sans-serif;margin:0;padding:20px">
-    <div style="max-width:520px;margin:0 auto;background:#0f0f1a;border-radius:16px;border:1px solid rgba(255,255,255,0.08);overflow:hidden">
-      <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:40px 32px;text-align:center">
-        <div style="font-size:40px;margin-bottom:12px">👋</div>
-        <h1 style="color:#fff;margin:0;font-size:26px">¡Bienvenido a TechStore!</h1>
+  <!DOCTYPE html><html><head><meta charset="UTF-8"><style>${corporateStyle}</style></head>
+  <body>
+    <div class="container">
+      <!-- Banner Premium Corporativo (Unsplash Setup/Setup) -->
+      <img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&q=80&w=600&h=180" class="banner" alt="TechStore Welcome Banner" />
+      <div class="header">
+        <div class="logo">Tech<span>Store</span></div>
+        <div style="font-size:14px;color:#6b7280;letter-spacing:1px;text-transform:uppercase;font-weight:600">Tecnología de Vanguardia</div>
       </div>
-      <div style="padding:32px 28px;text-align:center;">
-        <p style="color:#cbd5e1;font-size:16px;line-height:1.6;margin:0 0 24px">
-          Hola <strong>${name}</strong>,<br><br>
-          Tu cuenta ha sido creada exitosamente. Ya estás listo para explorar nuestro catálogo de productos tecnológicos y realizar compras seguras.
+      <div class="content" style="text-align:center">
+        <div class="greeting" style="font-size:26px">¡Bienvenido a TechStore, ${name}!</div>
+        <p class="text" style="font-size:16px;line-height:1.7;margin:25px 0 35px">
+          Queremos darte la bienvenida oficial a nuestra plataforma. Tu cuenta ha sido validada y ya formas parte de nuestra red de clientes preferenciales. 
+          <br><br>Prepárate para explorar la mejor tecnología del mercado con procesos de compra seguros y garantizados.
         </p>
-        <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/products" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:14px 28px;border-radius:12px;font-weight:bold;font-size:15px">
-          Ver Catálogo
-        </a>
-        <p style="color:#6b7280;font-size:13px;margin:32px 0 0">
-          Si tienes alguna duda, responde a este correo y te ayudaremos con gusto.
-        </p>
+        <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/products" class="button">Explorar el Catálogo</a>
       </div>
-      <div style="padding:16px;text-align:center;border-top:1px solid rgba(255,255,255,0.05)">
-        <p style="color:#374151;font-size:11px;margin:0">TechStore · La mejor tecnología al alcance de tu mano</p>
+      <div class="footer">
+        <p>TechStore Retail Group | Innovación y Tecnología 2026</p>
+        <p style="margin-top:8px">¿Necesitas ayuda comercial? Contáctanos a nuestro canal oficial de soporte.</p>
       </div>
     </div>
   </body></html>`;
 
   await transporter.sendMail({
-    from: `"TechStore" <${process.env.EMAIL_USER}>`,
+    from: `"TechStore Corporativo" <${process.env.EMAIL_USER}>`,
     to,
-    subject: `¡Bienvenido a TechStore, ${name}! 🎉`,
+    subject: `¡Tu cuenta oficial ha sido activada, ${name}! | TechStore`,
     html,
   });
-
-  console.log(`📧 Welcome email sent to ${to}`);
+  console.log(`📧 Corporate welcome email sent to ${to}`);
 }
