@@ -1,21 +1,61 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingCart, Menu, X, Zap } from 'lucide-react';
+import { ShoppingCart, Menu, X, Zap, User, Package, LogOut } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export function Navbar() {
   const { items } = useCart();
   const count = items.reduce((s, i) => s + i.quantity, 0);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    const name = localStorage.getItem('userName');
+    const token = localStorage.getItem('userToken');
+    if (name && token) setUserName(name);
+    // Listen for login/logout events
+    const handler = () => {
+      const n = localStorage.getItem('userName');
+      const t = localStorage.getItem('userToken');
+      setUserName(n && t ? n : null);
+    };
+    window.addEventListener('storage', handler);
+    window.addEventListener('authchange', handler);
+    return () => { window.removeEventListener('storage', handler); window.removeEventListener('authchange', handler); };
+  }, []);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userEmail');
+    setUserName(null);
+    setUserMenuOpen(false);
+    window.dispatchEvent(new Event('authchange'));
+  };
+
+  const navLinks = [
+    { href: '/products', label: 'Productos' },
+    { href: '/products?category=Laptops', label: 'Laptops' },
+    { href: '/products?category=Audio', label: 'Audio' },
+  ];
 
   return (
     <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? 'bg-[#080810]/80 backdrop-blur-xl border-b border-white/[0.06]' : 'bg-transparent'}`}>
@@ -30,13 +70,8 @@ export function Navbar() {
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-1">
-          {[
-            { href: '/products', label: 'Productos' },
-            { href: '/products?category=Laptops', label: 'Laptops' },
-            { href: '/products?category=Phones', label: 'Phones' },
-          ].map(l => (
-            <Link key={l.href} href={l.href}
-              className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+          {navLinks.map(l => (
+            <Link key={l.href} href={l.href} className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all">
               {l.label}
             </Link>
           ))}
@@ -44,8 +79,8 @@ export function Navbar() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Link href="/cart"
-            className="relative flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-all">
+          {/* Cart */}
+          <Link href="/cart" className="relative flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-all">
             <ShoppingCart className="w-4 h-4" />
             <span className="hidden sm:inline">Carrito</span>
             {count > 0 && (
@@ -55,9 +90,36 @@ export function Navbar() {
             )}
           </Link>
 
+          {/* User menu */}
+          {userName ? (
+            <div className="relative" ref={userMenuRef}>
+              <button onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-all">
+                <User className="w-4 h-4" />
+                <span className="hidden sm:inline max-w-[100px] truncate">{userName.split(' ')[0]}</span>
+              </button>
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-[#0f0f1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                  <Link href="/mis-ordenes" onClick={() => setUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                    <Package className="w-4 h-4 text-indigo-400" /> Mis Órdenes
+                  </Link>
+                  <div className="h-px bg-white/[0.06]" />
+                  <button onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors">
+                    <LogOut className="w-4 h-4" /> Cerrar sesión
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link href="/login" className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-all">
+              <User className="w-4 h-4" /> Entrar
+            </Link>
+          )}
+
           {/* Mobile menu toggle */}
-          <button onClick={() => setMenuOpen(!menuOpen)}
-            className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all">
+          <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all">
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
@@ -66,17 +128,18 @@ export function Navbar() {
       {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden bg-[#080810]/95 backdrop-blur-xl border-b border-white/5 px-4 pb-4">
-          {[
-            { href: '/products', label: 'Todos los productos' },
-            { href: '/products?category=Laptops', label: 'Laptops' },
-            { href: '/products?category=Phones', label: 'Phones' },
-            { href: '/products?category=Audio', label: 'Audio' },
-          ].map(l => (
+          {[...navLinks, { href: '/mis-ordenes', label: 'Mis Órdenes' }, ...(userName ? [] : [{ href: '/login', label: 'Iniciar Sesión' }])].map(l => (
             <Link key={l.href} href={l.href} onClick={() => setMenuOpen(false)}
               className="block py-3 text-sm text-gray-400 hover:text-white border-b border-white/5 last:border-0 transition-colors">
               {l.label}
             </Link>
           ))}
+          {userName && (
+            <button onClick={() => { handleLogout(); setMenuOpen(false); }}
+              className="block w-full text-left py-3 text-sm text-red-400 transition-colors">
+              Cerrar sesión
+            </button>
+          )}
         </div>
       )}
     </header>
