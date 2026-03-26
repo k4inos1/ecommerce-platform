@@ -11,6 +11,7 @@ import uploadRoutes from './routes/upload';
 import reviewRoutes from './routes/reviews';
 import scraperRoutes from './routes/scraper';
 import stripeRoutes from './routes/stripe';
+import transbankRoutes from './routes/transbank';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/stripe', stripeRoutes);
+app.use('/api/transbank', transbankRoutes);
 
 // Health check — always responds, even without DB
 app.get('/api/health', (_req, res) => {

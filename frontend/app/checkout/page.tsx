@@ -66,6 +66,55 @@ export default function CheckoutPage() {
     }
   };
 
+  // ── WebPay Checkout: save order then redirect to WebPay ──────────────
+  const handleWebpayCheckout = async () => {
+    if (items.length === 0 || !form.name || !form.email || !form.street || !form.city) {
+      alert('Por favor completa todos los datos de contacto y envío antes de pagar con WebPay.');
+      return;
+    }
+    setStripeLoading(true);
+    try {
+      let token = localStorage.getItem('userToken') || localStorage.getItem('adminToken');
+      if (!token) {
+        const res = await fetch(`${API}/api/auth/register`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.name, email: form.email, password: `guest_${Date.now()}` }),
+        });
+        if (res.ok) { const d = await res.json(); token = d.token; localStorage.setItem('userToken', token!); }
+      }
+      
+      const orderRes = await fetch(`${API}/api/orders`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          items: items.map(i => ({ product: i.id, name: i.name, price: i.price, quantity: i.quantity, image: i.image })),
+          shippingAddress: { name: form.name, street: form.street, city: form.city, region: form.region, postal: form.postal, country: form.country, phone: form.phone },
+          paymentMethod: 'webpay',
+          totalAmount: finalTotal,
+        }),
+      });
+      const order = await orderRes.json();
+      
+      const tbkRes = await fetch(`${API}/api/transbank/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ totalAmount: finalTotal, orderId: order._id }),
+      });
+      const { url, token: tbkToken } = await tbkRes.json();
+      
+      if (url && tbkToken) {
+        clearCart();
+        const f = document.createElement('form');
+        f.method = 'POST'; f.action = url;
+        const i = document.createElement('input');
+        i.type = 'hidden'; i.name = 'token_ws'; i.value = tbkToken;
+        f.appendChild(i); document.body.appendChild(f);
+        f.submit();
+      } else throw new Error('No Transbank URL returned');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Error con WebPay');
+      setStripeLoading(false);
+    }
+  };
+
   const field = (label: string, key: keyof typeof form, opts: { type?: string; placeholder?: string; maxLength?: number; mono?: boolean } = {}) => (
     <div key={key}>
       <label className="text-xs text-gray-400 mb-1.5 block">{label}</label>
@@ -260,11 +309,19 @@ export default function CheckoutPage() {
           <div className="flex justify-between font-bold text-white">
             <span>Total</span><span className="text-indigo-400 text-lg">${finalTotal.toFixed(2)}</span>
           </div>
-          {/* Stripe Checkout */}
-          <button onClick={handleStripeCheckout} disabled={stripeLoading}
-            className="w-full py-3.5 rounded-xl font-semibold text-sm bg-[#635bff] hover:bg-[#4f46e5] text-white transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#635bff]/30 disabled:opacity-60">
-            {stripeLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>💳 Pagar con Stripe</>}
-          </button>
+          <div className="space-y-3 mt-4">
+            {/* Stripe Checkout */}
+            <button onClick={handleStripeCheckout} disabled={stripeLoading}
+              className="w-full py-3.5 rounded-xl font-semibold text-sm bg-[#635bff] hover:bg-[#4f46e5] text-white transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#635bff]/30 disabled:opacity-60">
+              {stripeLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>💳 Pagar con Stripe</>}
+            </button>
+            
+            {/* WebPay Checkout */}
+            <button onClick={handleWebpayCheckout} disabled={stripeLoading}
+              className="w-full py-3.5 rounded-xl font-semibold text-sm bg-[#ed1c24] hover:bg-[#c20b12] text-white transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#ed1c24]/30 disabled:opacity-60">
+              {stripeLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>🇨🇱 Pagar con WebPay</>}
+            </button>
+          </div>
           <div className="flex items-center gap-3 text-gray-600 text-xs">
             <div className="flex-1 h-px bg-white/[0.05]" />o continúa con el formulario<div className="flex-1 h-px bg-white/[0.05]" />
           </div>
