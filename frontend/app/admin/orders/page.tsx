@@ -14,7 +14,7 @@ interface Order {
   createdAt: string;
   paymentMethod?: string;
   stripeSessionId?: string;
-  shippingAddress?: { name?: string; street?: string; city?: string; region?: string; country?: string };
+  shippingAddress?: { name?: string; street?: string; city?: string; region?: string; postal?: string; country?: string };
   items: { name: string; quantity: number; price: number; image?: string }[];
 }
 
