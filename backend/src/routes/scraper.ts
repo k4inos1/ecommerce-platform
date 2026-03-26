@@ -57,10 +57,21 @@ router.post('/calculate', protect, adminOnly, (req: AuthRequest, res: Response) 
 /** POST /api/scraper/import */
 router.post('/import', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
-    const { name, price, image, description, category, stock } = req.body;
+    const { name, price, image, description, category, stock, sourceUrl, supplierPrice, source } = req.body;
     if (!name || !price) return res.status(400).json({ message: 'name and price required' });
-    const product = await Product.create({ name, price: Number(price), image: image || '', description: description || '', category: category || 'Accessories', stock: Number(stock) || 10 });
-    res.status(201).json({ message: 'Product imported successfully', product });
+    const product = await Product.create({
+      name,
+      price: Number(price),
+      image: image || '',
+      description: description || '',
+      category: category || 'Accessories',
+      stock: Number(stock) || 10,
+      published: false,          // starts as draft — admin activates from panel
+      source: source || 'import',
+      sourceUrl: sourceUrl || '',
+      supplierPrice: Number(supplierPrice) || 0,
+    });
+    res.status(201).json({ message: 'Product saved as draft. Activate it from the admin panel.', product });
   } catch (err) {
     res.status(400).json({ message: 'Import failed', error: String(err) });
   }
