@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_18", "npm-9_x", "chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "ttf-dejavu"]
+nixPkgs = ["nodejs_20", "npm-10_x", "chromium", "nss", "freetype", "harfbuzz", "ca-certificates", "ttf-dejavu"]
 
 [phases.install]
 cmds = ["npm ci"]
