@@ -17,9 +17,10 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
 
   const navItems = [
     { href: '/admin/dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Dashboard' },
+    { href: '/admin/analytics', icon: <TrendingUp className="w-4 h-4" />, label: 'Analytics' },
     { href: '/admin/products', icon: <Package className="w-4 h-4" />, label: 'Productos' },
     { href: '/admin/orders', icon: <ShoppingCart className="w-4 h-4" />, label: 'Órdenes' },
-    { href: '/admin/import', icon: <TrendingUp className="w-4 h-4" />, label: 'Importar' },
+    { href: '/admin/import', icon: <Zap className="w-4 h-4" />, label: 'Importar' },
   ];
 
   return (
