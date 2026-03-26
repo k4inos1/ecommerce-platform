@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
+import { sendWelcomeEmail } from '../services/email';
 
 const router = Router();
 
@@ -15,6 +16,12 @@ router.post('/register', async (req: Request, res: Response) => {
     if (exists) return res.status(400).json({ message: 'Email already in use' });
 
     const user = await User.create({ name, email, password });
+    
+    // Send welcome email asynchronously so it doesn't block the response
+    if (!email.includes('guest_')) {
+      sendWelcomeEmail(email, name).catch(err => console.error('Failed to send welcome email:', err));
+    }
+
     const token = signToken(String(user._id), user.role);
     res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
