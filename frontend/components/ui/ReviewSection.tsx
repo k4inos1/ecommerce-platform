@@ -33,6 +33,12 @@ export function ReviewSection({ productId }: { productId: string }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  const [isLogged, setIsLogged] = useState(false);
+
+  useEffect(() => {
+    setIsLogged(!!localStorage.getItem('userToken'));
+  }, []);
+
   const fetchReviews = () => {
     fetch(`${API_URL}/api/reviews/${productId}`)
       .then(r => r.json())
@@ -48,10 +54,12 @@ export function ReviewSection({ productId }: { productId: string }) {
     setSubmitting(true);
     setError('');
     try {
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('Debes iniciar sesión para publicar una reseña');
+      
       const res = await fetch(`${API_URL}/api/reviews/${productId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(form),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.message); }
@@ -78,7 +86,12 @@ export function ReviewSection({ productId }: { productId: string }) {
       </div>
 
       {/* Review form */}
-      {!success ? (
+      {!isLogged ? (
+        <div className="card p-6 text-center">
+          <p className="text-gray-400 mb-4">Debes iniciar sesión para dejar una reseña sobre este producto.</p>
+          <a href="/login" className="btn-primary inline-flex text-sm py-2 px-6">Iniciar Sesión</a>
+        </div>
+      ) : !success ? (
         <div className="card p-6">
           <h3 className="font-semibold text-white mb-4">Deja tu reseña</h3>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -106,7 +119,7 @@ export function ReviewSection({ productId }: { productId: string }) {
           </form>
         </div>
       ) : (
-        <div className="card p-4 text-green-400 text-sm">✅ ¡Gracias por tu reseña!</div>
+        <div className="card p-4 text-green-400 text-sm text-center font-medium">✅ ¡Gracias por tu reseña!</div>
       )}
 
       {/* Reviews list */}
