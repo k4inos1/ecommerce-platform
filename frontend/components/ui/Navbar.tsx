@@ -100,6 +100,11 @@ export function Navbar() {
               </button>
               {userMenuOpen && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-[#0f0f1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                  <Link href="/profile" onClick={() => setUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                    <User className="w-4 h-4 text-emerald-400" /> Mi Perfil
+                  </Link>
+                  <div className="h-px bg-white/[0.06]" />
                   <Link href="/mis-ordenes" onClick={() => setUserMenuOpen(false)}
                     className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
                     <Package className="w-4 h-4 text-indigo-400" /> Mis Órdenes
@@ -128,7 +133,7 @@ export function Navbar() {
       {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden bg-[#080810]/95 backdrop-blur-xl border-b border-white/5 px-4 pb-4">
-          {[...navLinks, { href: '/mis-ordenes', label: 'Mis Órdenes' }, ...(userName ? [] : [{ href: '/login', label: 'Iniciar Sesión' }])].map(l => (
+          {[...navLinks, ...(userName ? [{ href: '/profile', label: 'Mi Perfil' }, { href: '/mis-ordenes', label: 'Mis Órdenes' }] : [{ href: '/login', label: 'Iniciar Sesión' }])].map(l => (
             <Link key={l.href} href={l.href} onClick={() => setMenuOpen(false)}
               className="block py-3 text-sm text-gray-400 hover:text-white border-b border-white/5 last:border-0 transition-colors">
               {l.label}
