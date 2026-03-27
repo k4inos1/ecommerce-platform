@@ -33,19 +33,20 @@ Este documento centraliza el estado actual, la arquitectura y la hoja de ruta de
 
 ---
 
-## 📋 Plan de Implementación: Sprint 4.0 (En progreso)
+## 📋 Plan de Implementación: Sprint 4.0 ✅ Completado
 
 ### Meta: Monetización y Dashboards de Usuario
 
-1.  **Pagos Integrados**:
-    - `POST /api/orders/stripe`: Checkout internacional con tarjeta.
-    - `POST /api/orders/transbank`: Botón de pago WebPay Plus (Débito/Crédito Chile).
-2.  **Dashboard de Órdenes (Cliente)**:
-    - Nueva página `/mis-ordenes` para ver el estado de tracking (`pending`, `shipped`, `delivered`).
-3.  **Analíticas Administrativas**:
-    - Gráficos de ventas y gestión de stock avanzada en `/admin/analytics`.
-4.  **Filtros de Búsqueda**:
-    - Búsqueda por rango de precios y categorías en el catálogo principal.
+1.  **Pagos Integrados** ✅:
+    - `POST /api/orders/stripe`: Checkout internacional con tarjeta (Stripe Checkout Session).
+    - `POST /api/orders/transbank`: Botón de pago WebPay Plus (Débito/Crédito Chile) con confirmación en `/checkout/transbank-result`.
+2.  **Dashboard de Órdenes (Cliente)** ✅:
+    - Página `/mis-ordenes` con estado de tracking (`pending`, `processing`, `shipped`, `delivered`, `cancelled`), progress bar visual y detalle expandible de cada orden.
+3.  **Analíticas Administrativas** ✅:
+    - Gráficos de ventas (14 días / 7 semanas), donut chart por estado, productos más vendidos y KPIs en `/admin/analytics`.
+4.  **Filtros de Búsqueda** ✅:
+    - Búsqueda por rango de precios (`minPrice`/`maxPrice`) y categorías en el catálogo principal `/products`.
+    - Botón "Filtros" con presets rápidos (< $100, $100–500, > $500) y limpieza automática.
 
 ---
 

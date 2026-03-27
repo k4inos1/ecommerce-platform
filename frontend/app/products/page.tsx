@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { Search, SlidersHorizontal, ShoppingCart, Check, Star } from 'lucide-react';
+import { Search, SlidersHorizontal, ShoppingCart, Check, Star, X } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -10,6 +10,11 @@ import { useSearchParams, useRouter } from 'next/navigation';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 const CATEGORIES = ['All', 'Laptops', 'Phones', 'Audio', 'Tablets', 'Wearables', 'Monitors', 'Accessories'];
 const EMOJI: Record<string, string> = { Laptops: '💻', Phones: '📱', Audio: '🎧', Tablets: '🖥️', Wearables: '⌚', Monitors: '🖵', Accessories: '🔧' };
+const PRICE_PRESETS = [
+  { label: '< $100', min: '', max: '99' },
+  { label: '$100–500', min: '100', max: '500' },
+  { label: '> $500', min: '500', max: '' },
+];
 
 interface Product { _id: string; name: string; price: number; image: string; category: string; description: string; stock: number; supplierPrice?: number }
 
@@ -21,6 +26,8 @@ function ProductsContent() {
   const [search, setSearch] = useState(params.get('q') || '');
   const [category, setCategory] = useState(params.get('category') || 'All');
   const [sort, setSort] = useState('newest');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -29,12 +36,20 @@ function ProductsContent() {
   const [showFilters, setShowFilters] = useState(false);
 
   const debouncedSearch = useDebounce(search, 400);
+  const debouncedMin = useDebounce(minPrice, 500);
+  const debouncedMax = useDebounce(maxPrice, 500);
+
+  const hasActiveFilters = minPrice !== '' || maxPrice !== '';
+
+  const clearPriceFilters = () => { setMinPrice(''); setMaxPrice(''); };
 
   useEffect(() => {
     setLoading(true); setError('');
     const q = new URLSearchParams();
     if (debouncedSearch) q.set('search', debouncedSearch);
     if (category !== 'All') q.set('category', category);
+    if (debouncedMin) q.set('minPrice', debouncedMin);
+    if (debouncedMax) q.set('maxPrice', debouncedMax);
     q.set('limit', '24');
 
     fetch(`${API}/api/products?${q}`)
@@ -42,7 +57,7 @@ function ProductsContent() {
       .then(d => { setProducts(d.products || []); setTotal(d.total || 0); })
       .catch(() => setError('No se pudo conectar al servidor.'))
       .finally(() => setLoading(false));
-  }, [debouncedSearch, category]);
+  }, [debouncedSearch, category, debouncedMin, debouncedMax]);
 
   // Client-side sort
   const sorted = [...products].sort((a, b) => {
@@ -78,6 +93,13 @@ function ProductsContent() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar productos..."
               className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none transition-colors" />
           </div>
+          {/* Filters toggle */}
+          <button onClick={() => setShowFilters(p => !p)}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${showFilters || hasActiveFilters ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/[0.03] border-white/[0.07] text-gray-400 hover:text-white hover:border-white/20'}`}>
+            <SlidersHorizontal className="w-4 h-4" />
+            <span className="hidden sm:inline">Filtros</span>
+            {hasActiveFilters && <span className="w-2 h-2 bg-white rounded-full" />}
+          </button>
           {/* Sort */}
           <select value={sort} onChange={e => setSort(e.target.value)}
             className="bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-3 text-sm text-gray-300 focus:border-indigo-500 focus:outline-none">
@@ -86,6 +108,51 @@ function ProductsContent() {
             <option value="price-desc">Precio ↓</option>
           </select>
         </div>
+
+        {/* Price range panel */}
+        {showFilters && (
+          <div className="card p-4 flex flex-col sm:flex-row items-start sm:items-end gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 uppercase font-mono mb-3 flex items-center justify-between">
+                Rango de precio
+                {hasActiveFilters && (
+                  <button onClick={clearPriceFilters} className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 transition-colors normal-case font-normal">
+                    <X className="w-3 h-3" /> Limpiar
+                  </button>
+                )}
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                  <input
+                    type="number" min="0" placeholder="Mín"
+                    value={minPrice}
+                    onChange={e => setMinPrice(e.target.value)}
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl pl-7 pr-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none transition-colors"
+                  />
+                </div>
+                <span className="text-gray-600 shrink-0">—</span>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                  <input
+                    type="number" min="0" placeholder="Máx"
+                    value={maxPrice}
+                    onChange={e => setMaxPrice(e.target.value)}
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl pl-7 pr-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {PRICE_PRESETS.map(r => (
+                <button key={r.label} onClick={() => { setMinPrice(r.min); setMaxPrice(r.max); }}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all ${minPrice === r.min && maxPrice === r.max ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/[0.03] border-white/[0.07] text-gray-400 hover:text-white hover:border-white/20'}`}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Category pills */}
         <div className="flex gap-2 flex-wrap">
@@ -114,8 +181,13 @@ function ProductsContent() {
       ) : sorted.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
           <div className="text-4xl mb-4">🔍</div>
-          <p className="font-medium text-white mb-1">Sin resultados para "{debouncedSearch}"</p>
-          <p className="text-sm">Intenta con otra categoría o término de búsqueda.</p>
+          <p className="font-medium text-white mb-1">Sin resultados{debouncedSearch ? ` para "${debouncedSearch}"` : ''}</p>
+          <p className="text-sm">Intenta con otra categoría{hasActiveFilters ? ', ajusta el rango de precio' : ''} o término de búsqueda.</p>
+          {hasActiveFilters && (
+            <button onClick={clearPriceFilters} className="mt-4 text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
+              Quitar filtro de precio
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
