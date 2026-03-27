@@ -1,0 +1,120 @@
+name: profit-calculator
+version: "1.0"
+description: >
+  Calcula la rentabilidad neta de un producto dado precio de venta, costo del
+  proveedor, envío, comisión de pasarela de pago y otros costos.
+  Devuelve desglose de costos, margen %, ROI y una recomendación semáforo.
+  Criterio de viabilidad mínimo: margen >= 30%.
+  Operación síncrona, sin I/O externo — respuesta inmediata.
+
+endpoint:
+  method: POST
+  path: /api/scraper/calculate
+  auth: jwt          # requiere header Authorization: Bearer <token> (admin)
+  content_type: application/json
+
+request_body:
+  type: object
+  required: [sellingPrice, supplierCost]
+  properties:
+    sellingPrice:
+      type: number
+      description: Precio final de venta al cliente (USD)
+    supplierCost:
+      type: number
+      description: Costo pagado al proveedor (USD)
+    shippingCost:
+      type: number
+      required: false
+      description: >
+        Costo de envío fijo en USD.
+        Si se omite, se estima como sellingPrice × 5%.
+    otherCosts:
+      type: number
+      required: false
+      default: 0
+      description: Otros costos variables (embalaje, almacenamiento, etc.) en USD
+
+returns:
+  type: object
+  properties:
+    revenue:
+      type: number
+      description: Ingreso bruto = sellingPrice
+    costs:
+      type: object
+      properties:
+        supplier:
+          type: number
+          description: Costo del proveedor
+        shipping:
+          type: number
+          description: Costo de envío (real o estimado)
+        paymentFee:
+          type: number
+          description: >
+            Comisión de pasarela de pago calculada como:
+            (sellingPrice × 2.9%) + $0.30 (tarifa Stripe estándar)
+        other:
+          type: number
+          description: Otros costos
+        total:
+          type: number
+          description: Suma de todos los costos
+    profit:
+      type: number
+      description: Ganancia neta = revenue - costs.total
+    marginPercent:
+      type: number
+      description: Margen neto en % = (profit / revenue) × 100
+    roi:
+      type: number
+      description: ROI en % = (profit / supplierCost) × 100
+    isViable:
+      type: boolean
+      description: true si marginPercent >= 30%
+    recommendation:
+      type: string
+      description: Evaluación semáforo en español con emoji
+
+viability_criteria:
+  minimum_margin: 30%
+  recommendation_thresholds:
+    "🟢 Excelente margen — producto altamente rentable": margin >= 50%
+    "🟢 Buen margen — producto rentable":                margin >= 40%
+    "🟡 Margen aceptable — cumple el mínimo del 30%":   margin >= 30%
+    "🟠 Margen bajo — considera ajustar el precio de venta": margin >= 20%
+    "🔴 Margen insuficiente — no viable según los criterios del skill": margin < 20%
+
+payment_fee_formula:
+  provider: Stripe
+  formula: "(sellingPrice × 0.029) + 0.30"
+  note: Aproximación estándar de Stripe para pagos con tarjeta en USD
+
+shipping_estimation:
+  when_omitted: "sellingPrice × 0.05"
+  note: Estimación conservadora del 5% del precio de venta
+
+example_request:
+  sellingPrice: 149.99
+  supplierCost: 45.00
+  shippingCost: 8.50
+
+example_response:
+  revenue: 149.99
+  costs:
+    supplier: 45.00
+    shipping: 8.50
+    paymentFee: 4.65
+    other: 0
+    total: 58.15
+  profit: 91.84
+  marginPercent: 61.2
+  roi: 204.1
+  isViable: true
+  recommendation: "🟢 Excelente margen — producto altamente rentable"
+
+errors:
+  400: sellingPrice o supplierCost ausentes o no numéricos
+  401: Token JWT inválido o ausente
+  403: Rol insuficiente (requiere admin)

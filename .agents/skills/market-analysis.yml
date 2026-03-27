@@ -1,0 +1,135 @@
+name: market-analysis
+version: "1.0"
+description: >
+  Analiza el mercado de un producto usando datos reales scrapeados en tiempo real:
+  DuckDuckGo para tamaño/crecimiento del mercado y eBay para distribución de
+  precios. Complementa con patrones de estacionalidad y demografía por categoría
+  derivados de datos públicos de Google Trends.
+
+endpoint:
+  method: GET
+  path: /api/scraper/market
+  auth: jwt          # requiere header Authorization: Bearer <token> (admin)
+  rate_limit: 10/min
+
+parameters:
+  - name: q
+    in: query
+    type: string
+    required: true
+    description: Producto o término de búsqueda (e.g. "wireless headphones")
+  - name: category
+    in: query
+    type: string
+    required: false
+    default: Accessories
+    enum: [Laptops, Phones, Audio, Tablets, Wearables, Monitors, Accessories]
+    description: Categoría del producto para datos de estacionalidad y demografía
+
+returns:
+  type: object
+  properties:
+    query:     { type: string }
+    category:  { type: string }
+    marketSize:
+      type: object
+      properties:
+        value:       { type: string,  description: "Tamaño extraído del snippet (e.g. '$52 billion')" }
+        unit:        { type: string,  description: "Siempre 'USD globales'" }
+        description: { type: string }
+    growthRate:
+      type: object
+      properties:
+        annual: { type: number, description: "CAGR extraído del snippet o 7.0% por defecto" }
+        trend:  { type: string, enum: [rising, stable, declining] }
+        label:  { type: string, description: "Etiqueta descriptiva en español" }
+    seasonality:
+      type: array
+      items:
+        type: object
+        properties:
+          month:       { type: string }
+          shortMonth:  { type: string }
+          demandLevel: { type: integer, minimum: 1, maximum: 10 }
+    demographics:
+      type: array
+      items:
+        type: object
+        properties:
+          segment:     { type: string }
+          percentage:  { type: number }
+          description: { type: string }
+    pricePoints:
+      type: array
+      description: Distribución de precios extraída de eBay sold listings
+      items:
+        type: object
+        properties:
+          range:  { type: string,  description: "Rango de precio (e.g. '$30–$300')" }
+          volume: { type: string,  enum: [high, medium, low] }
+          label:  { type: string }
+    opportunityScore:
+      type: integer
+      minimum: 0
+      maximum: 100
+      description: >
+        Puntaje de oportunidad calculado como:
+        base(60) + trend_bonus(±15) + growth_bonus(5–10)
+        Rango real: 40–95
+    summary:
+      type: string
+      description: Resumen narrativo con datos scrapeados y recomendación de posicionamiento
+    sources:
+      type: array
+      items: { type: string }
+      description: URLs/dominios de las fuentes usadas (máx 3 de DuckDuckGo)
+
+scraping_sources:
+  primary:
+    name: DuckDuckGo HTML
+    url_template: "https://html.duckduckgo.com/html/?q={query}+market+size+growth+2025"
+    extracts: [summary_snippet, source_urls, growth_rate, market_size]
+    timeout: 12s
+  secondary:
+    name: eBay Sold Listings
+    url_template: "https://www.ebay.com/sch/i.html?_nkw={query}&LH_Sold=1&LH_BIN=1&_sop=12"
+    extracts: [price_distribution]
+    timeout: 12s
+    price_buckets:
+      - range: "$0–$30"
+        label: "Entrada / Impulso"
+      - range: "$30–$300"
+        label: "Mid-range / Mayor volumen"
+      - range: "$300–$800"
+        label: "Premium / Alto margen"
+      - range: "$800+"
+        label: "Ultra-premium / Nicho"
+    volume_thresholds:
+      high:   "> 40% de los precios en el bucket"
+      medium: "20–40%"
+      low:    "< 20%"
+
+opportunity_score_formula: >
+  base = 60
+  + (trend == 'rising' ? +15 : trend == 'declining' ? -15 : 0)
+  + (annual_growth > 10 ? +10 : annual_growth > 5 ? +5 : 0)
+  clamped to [40, 95]
+
+seasonality_data:
+  source: "Google Trends public data (patrones por categoría)"
+  scale: 1–10 por mes (Enero–Diciembre)
+  categories:
+    Laptops:     [5,4,6,6,7,5,6,8,9,8,7,6]
+    Phones:      [4,4,5,5,6,5,6,7,9,8,7,7]
+    Audio:       [5,4,5,6,7,6,7,7,8,9,9,10]
+    Tablets:     [5,4,5,6,6,5,6,7,8,7,8,7]
+    Wearables:   [5,5,6,7,8,9,9,10,8,7,7,6]
+    Monitors:    [5,5,6,6,7,6,7,8,9,7,7,6]
+    Accessories: [4,4,5,5,6,6,6,7,7,7,9,10]
+
+errors:
+  400: Query vacío — proporciona el parámetro ?q=
+  401: Token JWT inválido o ausente
+  403: Rol insuficiente (requiere admin)
+  429: Rate limit alcanzado — espera 60 segundos
+  500: Fallo en el análisis de mercado
