@@ -5,6 +5,7 @@
 import { chromium } from 'playwright';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
+import { getChromiumExecutablePath } from '../utils/browser';
 
 export interface Supplier {
   name: string;
@@ -52,6 +53,7 @@ function guessCategory(text: string): string {
 async function scrapeAlibabaPlaywright(query: string, count: number): Promise<Supplier[]> {
   const browser = await chromium.launch({
     headless: true,
+    executablePath: getChromiumExecutablePath(),
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
   const context = await browser.newContext({

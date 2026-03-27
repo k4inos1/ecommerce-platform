@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm-10_x", "chromium", "nss", "freetype", "harfbuzz"]
+nixPkgs = ["nodejs_20", "npm-10_x", "chromium", "nss", "freetype", "harfbuzz", "expat", "libpng", "libdrm", "mesa", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libxcb", "alsa-lib", "at-spi2-atk", "at-spi2-core", "atk", "cups", "dbus", "glib", "gtk3", "pango"]
 
 [phases.install]
 cmds = ["npm ci"]
@@ -11,5 +11,4 @@ cmds = ["cd backend && npm install && npm run build"]
 cmd = "cd backend && npm start"
 
 [variables]
-PLAYWRIGHT_BROWSERS_PATH = "/nix/store"
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
