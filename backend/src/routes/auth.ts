@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import passport from 'passport';
+import crypto from 'crypto';
 import { User } from '../models/User';
-import { sendWelcomeEmail } from '../services/email';
+import { sendWelcomeEmail, sendPasswordResetEmail } from '../services/email';
 
 const router = Router();
 
@@ -41,6 +42,74 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const token = signToken(String(user._id), user.role);
     res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+// ─── Password Recovery ────────────────────────────────────
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    
+    // We send success even if user not found to prevent email enumeration
+    if (!user) {
+      return res.status(200).json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+    }
+
+    // Generate random reset token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+    
+    // Hash token and save to DB
+    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.resetPasswordExpire = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    
+    await user.save();
+
+    // Create reset url (frontend)
+    const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+    try {
+      await sendPasswordResetEmail(user.email, resetUrl);
+      res.status(200).json({ message: 'Si el correo existe, se ha enviado un enlace de recuperación.' });
+    } catch (err) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+      return res.status(500).json({ message: 'Error enviando el correo' });
+    }
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+// POST /api/auth/reset-password/:token
+router.post('/reset-password/:token', async (req: Request, res: Response) => {
+  try {
+    // Reconstruct the hash from the URL token
+    const resetPasswordToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Token inválido o expirado' });
+    }
+
+    // Set new password (the model's pre-save hook will hash it)
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    
+    await user.save();
+
+    res.status(200).json({ message: 'Contraseña actualizada correctamente' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
   }

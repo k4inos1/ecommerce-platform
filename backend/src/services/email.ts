@@ -138,3 +138,43 @@ export async function sendWelcomeEmail(to: string, name: string) {
   });
   console.log(`📧 Corporate welcome email sent to ${to}`);
 }
+
+export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log('📧 Password reset email skipped — EMAIL_USER/EMAIL_PASS not configured');
+    return;
+  }
+
+  const html = `
+  <!DOCTYPE html><html><head><meta charset="UTF-8"><style>${corporateStyle}</style></head>
+  <body>
+    <div class="container">
+      <!-- Banner Premium Corporativo (Unsplash Security) -->
+      <img src="https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?auto=format&fit=crop&q=80&w=600&h=180" class="banner" alt="Security Banner" />
+      <div class="header">
+        <div class="logo">Tech<span>Store</span></div>
+        <div style="font-size:14px;color:#6b7280;letter-spacing:1px;text-transform:uppercase;font-weight:600">Sistema de Seguridad</div>
+      </div>
+      <div class="content" style="text-align:center">
+        <div class="greeting" style="font-size:26px">Recuperación de Contraseña</div>
+        <p class="text" style="font-size:16px;line-height:1.7;margin:25px 0 35px">
+          Hemos recibido una solicitud oficial para restablecer la contraseña de tu cuenta.
+          <br><br>Si fuiste tú, haz clic en el siguiente botón seguro. Este enlace caducará en 15 minutos por protocolos de seguridad.
+        </p>
+        <a href="${resetUrl}" class="button">Restablecer mi Contraseña</a>
+      </div>
+      <div class="footer">
+        <p>TechStore Security Operations Center | Innovación 2026</p>
+        <p style="margin-top:8px">Si no solicitaste este cambio, ignora este correo. Tus datos permanecen asegurados.</p>
+      </div>
+    </div>
+  </body></html>`;
+
+  await transporter.sendMail({
+    from: `"TechStore Seguridad" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `🔐 Restablecer contraseña | TechStore`,
+    html,
+  });
+  console.log(`📧 Corporate password reset email sent to ${to}`);
+}
