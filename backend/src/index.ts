@@ -36,6 +36,9 @@ app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(morgan('dev'));
 
+import passport from './config/passport';
+app.use(passport.initialize());
+
 // ─── Routes ──────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
