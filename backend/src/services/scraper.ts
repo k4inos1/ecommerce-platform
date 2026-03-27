@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { chromium } from 'playwright';
+import { getChromiumExecutablePath } from '../utils/browser';
 
 export interface ScrapedProduct {
   name: string;
@@ -38,7 +39,7 @@ function estimateDemand(score: number): number { return Math.round(Math.max(1, M
  * Strategy 1: Scrape AliExpress with headless Playwright browser
  */
 async function scrapeAliExpressPlaywright(query: string, limit: number): Promise<ScrapedProduct[]> {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  const browser = await chromium.launch({ headless: true, executablePath: getChromiumExecutablePath(), args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     locale: 'en-US',
@@ -91,7 +92,7 @@ async function scrapeAliExpressPlaywright(query: string, limit: number): Promise
  * Strategy 2: Scrape eBay with Playwright (more reliable, less anti-bot)
  */
 async function scrapeEbayPlaywright(query: string, limit: number): Promise<ScrapedProduct[]> {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  const browser = await chromium.launch({ headless: true, executablePath: getChromiumExecutablePath(), args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   });
