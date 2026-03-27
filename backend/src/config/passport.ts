@@ -6,8 +6,8 @@ import { User } from '../models/User';
 passport.use(
   new GoogleStrategy(
     {
-      clientID: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      clientID: process.env.GOOGLE_CLIENT_ID || 'mock_id',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'mock_secret',
       callbackURL: '/api/auth/google/callback',
     },
     async (accessToken, refreshToken, profile, done) => {
@@ -40,8 +40,8 @@ passport.use(
 passport.use(
   new FacebookStrategy(
     {
-      clientID: process.env.FACEBOOK_APP_ID || '',
-      clientSecret: process.env.FACEBOOK_APP_SECRET || '',
+      clientID: process.env.FACEBOOK_APP_ID || 'mock_id',
+      clientSecret: process.env.FACEBOOK_APP_SECRET || 'mock_secret',
       callbackURL: '/api/auth/facebook/callback',
       profileFields: ['id', 'displayName', 'emails'],
     },
