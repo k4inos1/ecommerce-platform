@@ -1,0 +1,133 @@
+name: supplier-finder
+version: "1.0"
+description: >
+  Busca proveedores reales en Alibaba para un producto dado. Utiliza Playwright
+  para renderizado JS completo (estrategia principal) y axios/cheerio como
+  fallback ligero. Devuelve nombre de empresa, país, ratings, precio unitario,
+  MOQ, disponibilidad de muestra, certificaciones y URL del proveedor.
+
+endpoint:
+  method: GET
+  path: /api/scraper/suppliers
+  auth: jwt          # requiere header Authorization: Bearer <token> (admin)
+  rate_limit: 10/min
+
+parameters:
+  - name: q
+    in: query
+    type: string
+    required: true
+    description: Producto o término de búsqueda (e.g. "wireless headphones")
+  - name: category
+    in: query
+    type: string
+    required: false
+    default: Accessories
+    enum: [Laptops, Phones, Audio, Tablets, Wearables, Monitors, Accessories]
+    description: Categoría del producto — determina las certificaciones esperadas
+  - name: count
+    in: query
+    type: integer
+    required: false
+    default: 6
+    minimum: 1
+    maximum: 10
+    description: Número de proveedores a devolver
+
+returns:
+  type: object
+  properties:
+    suppliers:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+            maxLength: 80
+            description: Nombre oficial de la empresa en Alibaba
+          country:
+            type: string
+            description: País del proveedor (generalmente 'China')
+          rating:
+            type: number
+            minimum: 4.0
+            maximum: 5.0
+            description: Calificación del proveedor (real o estimada en rango 4.0–5.0)
+          reviewCount:
+            type: integer
+            description: Número de reseñas (0 si no se pudo extraer)
+          yearsActive:
+            type: integer
+            minimum: 1
+            description: Años de actividad en Alibaba
+          verified:
+            type: boolean
+            description: true si el proveedor tiene badge Verified o Gold
+          goldSupplier:
+            type: boolean
+            description: true si es Gold Supplier de Alibaba
+          unitPrice:
+            type: number
+            description: Precio unitario en USD (0 si no se pudo extraer del HTML)
+          moq:
+            type: integer
+            description: "Mínimo de orden (valores: 50, 100, 200 — rotación cíclica)"
+          sampleAvailable:
+            type: boolean
+            description: true para los primeros 5 proveedores del listado
+          samplePrice:
+            type: number
+            description: "Precio de muestra estimado: 15 + (posición × 3) USD"
+          shippingDays:
+            type: integer
+            description: "Días de envío estimados: 18 + (posición × 2)"
+          responseTime:
+            type: string
+            description: "Tiempo de respuesta rotativo: < 24h / < 48h / < 72h"
+          certifications:
+            type: array
+            items: { type: string }
+            description: Certificaciones relevantes por categoría (hasta 3)
+          alibabaUrl:
+            type: string
+            description: URL del perfil del proveedor o búsqueda en Alibaba
+    count:
+      type: integer
+
+scraping_strategy:
+  cascade:
+    - name: Alibaba (Playwright)
+      url_template: "https://www.alibaba.com/trade/search?SearchText={query}&IndexArea=product_en&filter=Y"
+      timeout: 25s
+      wait_after_load: 3.5s
+      card_selectors:
+        - .m-gallery-product-item-v2
+        - .J-offer-wrapper
+        - "[class*='list-no-img-item']"
+        - "[class*='gallery-offer-item']"
+        - "[data-spm*='offer']"
+      min_results_to_accept: 2
+    - name: Alibaba (axios/cheerio)
+      url_template: "https://www.alibaba.com/trade/search?SearchText={query}&IndexArea=product_en&filter=Y"
+      timeout: 15s
+      company_selectors: ["[class*='company-name']", ".company-name"]
+      min_results_to_accept: 1
+
+certifications_by_category:
+  Laptops:     [CE, FCC, RoHS, "ISO 9001"]
+  Phones:      [CE, FCC, RoHS, UN38.3]
+  Audio:       [CE, FCC, RoHS]
+  Tablets:     [CE, FCC, RoHS, UN38.3]
+  Wearables:   [CE, FCC, RoHS, IP68]
+  Monitors:    [CE, FCC, RoHS, "Energy Star"]
+  Accessories: [CE, RoHS]
+
+errors:
+  400: Query vacío — proporciona el parámetro ?q=
+  401: Token JWT inválido o ausente
+  403: Rol insuficiente (requiere admin)
+  429: Rate limit alcanzado — espera 60 segundos
+  500: >
+    Todas las fuentes fallaron — Alibaba puede estar bloqueando.
+    Prueba un término diferente o verifica el acceso de red.

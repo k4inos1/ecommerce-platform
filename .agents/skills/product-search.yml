@@ -1,0 +1,92 @@
+name: product-search
+version: "1.0"
+description: >
+  Busca productos en marketplaces externos (AliExpress y eBay) mediante web
+  scraping con Playwright (renderizado JS completo) y cheerio (fallback rápido).
+  Devuelve hasta 24 productos con nombre, precio, imagen, margen estimado,
+  nivel de competencia y tendencia de mercado.
+
+endpoint:
+  method: GET
+  path: /api/scraper/search
+  auth: jwt          # requiere header Authorization: Bearer <token> (admin)
+  rate_limit: 10/min
+
+parameters:
+  - name: q
+    in: query
+    type: string
+    required: true
+    description: Término de búsqueda (e.g. "wireless headphones", "gaming laptop")
+  - name: limit
+    in: query
+    type: integer
+    required: false
+    default: 12
+    minimum: 1
+    maximum: 24
+    description: Número máximo de productos a devolver
+
+returns:
+  type: object
+  properties:
+    products:
+      type: array
+      items:
+        type: object
+        properties:
+          name:           { type: string,  description: "Nombre del producto (máx 120 caracteres)" }
+          price:          { type: number,  description: "Precio de venta en USD" }
+          image:          { type: string,  description: "URL de la imagen principal" }
+          description:    { type: string,  description: "Descripción breve del producto" }
+          category:       { type: string,  enum: [Laptops, Phones, Audio, Tablets, Wearables, Monitors, Accessories] }
+          supplierPrice:  { type: number,  description: "Precio estimado de costo al proveedor" }
+          margin:         { type: number,  description: "Margen estimado de ganancia en %" }
+          demandScore:    { type: integer, minimum: 1, maximum: 10, description: "Índice de demanda (1–10)" }
+          competitionLevel: { type: string, enum: [low, medium, high] }
+          trend:          { type: string,  enum: [rising, stable, declining] }
+          source:         { type: string,  description: "Marketplace origen (AliExpress / eBay)" }
+          sourceUrl:      { type: string,  description: "URL original del producto" }
+    count:
+      type: integer
+      description: Total de productos devueltos
+
+scraping_strategy:
+  cascade:
+    - name: AliExpress (Playwright)
+      description: Renderizado JS completo; mejor cobertura de productos
+      min_results_to_accept: 3
+    - name: eBay (cheerio)
+      description: Scraping estático, rápido y más fiable contra anti-bot
+      min_results_to_accept: 3
+    - name: eBay (Playwright)
+      description: Fallback con renderizado JS si cheerio no obtiene resultados
+
+category_detection:
+  method: regex sobre el nombre del producto
+  categories:
+    Laptops:     /(laptop|notebook|macbook|ideapad|thinkpad|chromebook|gaming pc)/i
+    Phones:      /(phone|iphone|samsung|xiaomi|pixel|smartphone|mobile)/i
+    Audio:       /(headphone|earphone|airpod|earbud|speaker|headset|audio|sound)/i
+    Tablets:     /(tablet|ipad|surface|galaxy tab|drawing pad)/i
+    Wearables:   /(watch|band|fitbit|garmin|wearable|smartwatch|fitness)/i
+    Monitors:    /(monitor|display|screen|4k oled|curved screen)/i
+    default:     Accessories
+
+margin_estimation:
+  method: porcentaje fijo por categoría
+  values:
+    Laptops:     18%
+    Phones:      22%
+    Audio:       45%
+    Tablets:     25%
+    Wearables:   40%
+    Monitors:    30%
+    Accessories: 55%
+
+errors:
+  400: Query vacío — proporciona el parámetro ?q=
+  401: Token JWT inválido o ausente
+  403: Rol insuficiente (requiere admin)
+  429: Rate limit alcanzado — espera 60 segundos
+  500: Todas las fuentes de scraping fallaron

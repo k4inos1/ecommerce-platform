@@ -1,0 +1,117 @@
+name: listing-optimizer
+version: "1.0"
+description: >
+  Genera una optimización completa de listing de e-commerce para un producto:
+  título SEO optimizado, 5 bullet points con emojis, 8 palabras clave long-tail,
+  descripción genérica, ideas de contenido A+, y puntuaciones SEO/título.
+  Operación síncrona sin scraping externo — respuesta inmediata.
+
+endpoint:
+  method: GET
+  path: /api/scraper/optimize
+  auth: jwt          # requiere header Authorization: Bearer <token> (admin)
+  rate_limit: none   # no scraping externo, sin rate limit dedicado
+
+parameters:
+  - name: name
+    in: query
+    type: string
+    required: true
+    description: Nombre del producto a optimizar (e.g. "Sony WH-1000XM5")
+  - name: category
+    in: query
+    type: string
+    required: false
+    default: Accessories
+    enum: [Laptops, Phones, Audio, Tablets, Wearables, Monitors, Accessories]
+    description: Categoría del producto — determina keywords, bullets y A+ ideas
+
+returns:
+  type: object
+  properties:
+    originalName:
+      type: string
+      description: Nombre original del producto tal como fue recibido
+    category:
+      type: string
+    optimizedTitle:
+      type: string
+      maxLength: 200
+      description: >
+        Título optimizado con patrón:
+        "{originalName} {feature_suffix} | {keyword1} {keyword2}"
+    bullets:
+      type: array
+      minItems: 5
+      maxItems: 5
+      items: { type: string }
+      description: >
+        5 bullet points con emojis, mayúsculas en el gancho inicial y
+        mención del nombre de producto en el primer bullet
+    keywords:
+      type: array
+      minItems: 8
+      maxItems: 8
+      items: { type: string }
+      description: 8 palabras clave long-tail seleccionadas del pool de la categoría
+    description:
+      type: string
+      description: Descripción genérica SEO-friendly para la ficha del producto
+    aPlusIdeas:
+      type: array
+      items: { type: string }
+      description: Ideas de contenido A+ / contenido enriquecido para la página del producto
+    seoScore:
+      type: integer
+      minimum: 0
+      maximum: 100
+      description: >
+        Puntuación SEO calculada como:
+        (titleScore * 0.4) + (bullets >= 5 ? 30 : 15) + (keywords >= 7 ? 30 : 15)
+    titleScore:
+      type: integer
+      minimum: 0
+      maximum: 100
+      description: >
+        Puntuación del título:
+        base(60) + longitud > 100 chars (+20) + contiene keyword (+20)
+    suggestions:
+      type: array
+      minItems: 5
+      maxItems: 5
+      items: { type: string }
+      description: Recomendaciones adicionales para mejorar el listing
+
+title_pattern:
+  template: "{name} {feature_suffix} | {keyword1} {keyword2}"
+  feature_suffixes:
+    Laptops:     "- SSD Rápido, Batería Larga Duración"
+    Phones:      "- 5G, Cámara Pro, Carga Rápida"
+    Audio:       "- Cancelación de Ruido, Bluetooth 5.3"
+    Tablets:     "- Pantalla HD, Wi-Fi 6, Stylus Compatible"
+    Wearables:   "- GPS, Frecuencia Cardíaca, Impermeable"
+    Monitors:    "- 4K, HDR, Baja Latencia"
+    Accessories: "- Universal, Premium, Garantía 1 Año"
+
+keyword_pools:
+  Laptops:     [laptop, notebook, portable, "gaming laptop", "business laptop", ultrabook, lightweight, "fast SSD", "long battery", "thin notebook", "budget laptop", i7, Ryzen, RAM DDR5]
+  Phones:      [smartphone, "unlocked phone", "Android phone", "5G phone", "camera phone", "budget phone", flagship, "dual SIM", "long battery", "gaming phone", AMOLED, "fast charging"]
+  Audio:       ["wireless headphones", "noise cancelling", earbuds, "bluetooth headset", "gaming headset", "over ear", "true wireless", audiophile, "bass boosted", microphone, foldable]
+  Tablets:     [tablet, "Android tablet", "iPad alternative", "10 inch tablet", "kids tablet", "drawing tablet", stylus, "HD display", "quad core", "portable screen", e-learning]
+  Wearables:   ["smart watch", "fitness tracker", "health monitor", "GPS watch", "heart rate", waterproof, "step counter", "sleep tracker", "AMOLED watch", band, calories]
+  Monitors:    ["4K monitor", "gaming monitor", "USB-C monitor", "curved monitor", "IPS panel", 144Hz, ultrawide, "portable monitor", "OLED display", HDR, "dual monitor"]
+  Accessories: ["phone case", "charging cable", "USB hub", keyboard, mouse, webcam, stand, adapter, "screen protector", bag, organizer]
+
+aplus_ideas:
+  Laptops:     ["Comparativa de rendimiento vs la competencia", "Diagrama de puertos y conectividad", "Guía de compatibilidad con software", "Video unboxing y setup"]
+  Phones:      ["Comparativa de cámara en condiciones reales", "Gráfico de autonomía de batería", "Cuadro de especificaciones técnicas", "FAQ sobre garantía y reparaciones"]
+  Audio:       ["Curva de respuesta de frecuencia", "Comparativa antes/después de noise cancelling", "Compatibilidad con dispositivos", "Instrucciones de emparejamiento"]
+  Tablets:     ["Casos de uso: trabajo, estudio, entretenimiento", "Accesorios compatibles (stylus, teclado)", "Tabla comparativa resolución/precio", "Demo de rendimiento en apps"]
+  Wearables:   ["Visualización de datos de salud en la app", "Tabla de resistencia al agua IP", "Comparativa de duración de batería", "Guía de configuración inicial"]
+  Monitors:    ["Test de calibración de colores sRGB/DCI-P3", "Diagrama de conectividad (HDMI/DP/USB-C)", "Comparativa Hz latencia para gaming", "Setup ergonómico recomendado"]
+  Accessories: ["Guía de compatibilidad universal", "Video de instalación en 60 segundos", "Tabla de materiales y durabilidad", "Pack regalo: accesorios complementarios"]
+
+errors:
+  400: Parámetro "name" vacío o ausente
+  401: Token JWT inválido o ausente
+  403: Rol insuficiente (requiere admin)
