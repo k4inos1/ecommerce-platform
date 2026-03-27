@@ -1,5 +1,6 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as FacebookStrategy } from 'passport-facebook';
 import { User } from '../models/User';
 
 passport.use(
@@ -24,6 +25,40 @@ passport.use(
             name: profile.displayName || email.split('@')[0],
             email,
             password: `oauth_${Date.now()}_${Math.random()}`, // Password required by schema but useless for OAuth
+            role: 'user',
+          });
+        }
+
+        return done(null, user);
+      } catch (error) {
+        return done(error, false);
+      }
+    }
+  )
+);
+
+passport.use(
+  new FacebookStrategy(
+    {
+      clientID: process.env.FACEBOOK_APP_ID || '',
+      clientSecret: process.env.FACEBOOK_APP_SECRET || '',
+      callbackURL: '/api/auth/facebook/callback',
+      profileFields: ['id', 'displayName', 'emails'],
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        if (!profile.emails || profile.emails.length === 0) {
+          return done(new Error('No email found from Facebook'), false);
+        }
+
+        const email = profile.emails[0].value;
+        let user = await User.findOne({ email });
+
+        if (!user) {
+          user = await User.create({
+            name: profile.displayName || email.split('@')[0],
+            email,
+            password: `oauth_${Date.now()}_${Math.random()}`,
             role: 'user',
           });
         }

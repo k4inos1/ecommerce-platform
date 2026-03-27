@@ -70,4 +70,27 @@ router.get(
   }
 );
 
+// ─── Facebook OAuth ───────────────────────────────────────
+
+// Initiate Facebook Login
+router.get('/facebook', passport.authenticate('facebook', { scope: ['public_profile', 'email'] }));
+
+// Facebook Callback
+router.get(
+  '/facebook/callback',
+  passport.authenticate('facebook', { session: false, failureRedirect: '/login?error=oauth_failed' }),
+  (req: Request, res: Response) => {
+    try {
+      const user: any = req.user;
+      const token = signToken(String(user._id), user.role);
+      
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      res.redirect(`${frontendUrl}/login?token=${token}`);
+    } catch (err) {
+      console.error('Facebook callback error:', err);
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=server_error`);
+    }
+  }
+);
+
 export default router;
