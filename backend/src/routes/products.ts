@@ -9,11 +9,18 @@ const router = Router();
 // GET /api/products — only published products for the store
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { search, category, page = 1, limit = 12 } = req.query;
-    const query: Record<string, unknown> = { published: true };
+    const { search, category, minPrice, maxPrice, page = 1, limit = 12 } = req.query;
+    const query: Record<string, any> = { published: true };
 
     if (search) query.$text = { $search: search as string };
     if (category && category !== 'All') query.category = category;
+    
+    // Price filtering
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const [products, total] = await Promise.all([
