@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import passport from 'passport';
 import { User } from '../models/User';
 import { sendWelcomeEmail } from '../services/email';
 
@@ -44,5 +45,29 @@ router.post('/login', async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Server error', error: err });
   }
 });
+
+// ─── Google OAuth ─────────────────────────────────────────
+
+// Initiate Google Login
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+// Google Callback
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: '/login?error=oauth_failed' }),
+  (req: Request, res: Response) => {
+    try {
+      const user: any = req.user;
+      const token = signToken(String(user._id), user.role);
+      
+      const frontendUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      // Redirect to frontend login page passing the JWT in the query string
+      res.redirect(`${frontendUrl}/login?token=${token}`);
+    } catch (err) {
+      console.error('Google callback error:', err);
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=server_error`);
+    }
+  }
+);
 
 export default router;
