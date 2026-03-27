@@ -29,7 +29,7 @@ passport.use(
           });
         }
 
-        return done(null, user);
+        return done(null, user as any);
       } catch (error) {
         return done(error, false);
       }
@@ -63,7 +63,7 @@ passport.use(
           });
         }
 
-        return done(null, user);
+        return done(null, user as any);
       } catch (error) {
         return done(error, false);
       }

@@ -2,8 +2,18 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 
+declare global {
+  namespace Express {
+    interface User {
+      id: string;
+      role: string;
+      [key: string]: any;
+    }
+  }
+}
+
 export interface AuthRequest extends Request {
-  user?: { id: string; role: string };
+  user?: Express.User;
 }
 
 export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
