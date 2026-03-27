@@ -18,6 +18,7 @@ export interface IOrder extends Document {
     postal?: string; country?: string; phone?: string;
   };
   stripeSessionId?: string;
+  webpayToken?: string;
   paidAt?: Date;
   paymentMethod?: string;
   createdAt: Date;
@@ -46,6 +47,7 @@ const OrderSchema = new Schema<IOrder>(
       postal: String, country: String, phone: String,
     },
     stripeSessionId: { type: String },
+    webpayToken: { type: String },
     paidAt: { type: Date },
     paymentMethod: { type: String, default: 'card' },
   },

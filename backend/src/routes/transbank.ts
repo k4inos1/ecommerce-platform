@@ -52,7 +52,7 @@ router.post('/create', protect, async (req: AuthRequest, res: Response) => {
 
     // Store the transbank token in the order
     if (orderId) {
-      await Order.findByIdAndUpdate(orderId, { stripeSessionId: `tbk_${token}`, paymentMethod: 'webpay' });
+      await Order.findByIdAndUpdate(orderId, { webpayToken: token, paymentMethod: 'webpay' });
     }
 
     res.json({ token, url });
@@ -78,7 +78,7 @@ router.post('/confirm', protect, async (req: AuthRequest, res: Response) => {
     if (response.response_code === 0) {
       // Payment approved — find order by token and mark as processing
       await Order.findOneAndUpdate(
-        { stripeSessionId: `tbk_${token_ws}` },
+        { webpayToken: token_ws },
         { status: 'processing', paidAt: new Date() }
       );
       res.json({ success: true, response });
