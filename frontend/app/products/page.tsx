@@ -11,7 +11,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 const CATEGORIES = ['All', 'Laptops', 'Phones', 'Audio', 'Tablets', 'Wearables', 'Monitors', 'Accessories'];
 const EMOJI: Record<string, string> = { Laptops: '💻', Phones: '📱', Audio: '🎧', Tablets: '🖥️', Wearables: '⌚', Monitors: '🖵', Accessories: '🔧' };
 const PRICE_PRESETS = [
-  { label: '< $100', min: '', max: '99' },
+  { label: '< $100', min: '', max: '100' },
   { label: '$100–500', min: '100', max: '500' },
   { label: '> $500', min: '500', max: '' },
 ];

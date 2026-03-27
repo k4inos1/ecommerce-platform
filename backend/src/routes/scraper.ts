@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { scrapeProducts } from '../services/scraper';
 import { calculateProfit } from '../utils/profitCalculator';
 import { analyzeMarket } from '../services/marketAnalysis';
@@ -9,8 +10,18 @@ import { Product } from '../models/Product';
 
 const router = Router();
 
+// Scraping routes hit external web services — limit to 10 req/min per IP to
+// prevent accidental abuse and protect against compromised admin tokens.
+const scraperLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Demasiadas solicitudes de scraping. Espera un momento e intenta de nuevo.' },
+});
+
 /** GET /api/scraper/search?q=laptops&limit=12 */
-router.get('/search', protect, adminOnly, async (req: AuthRequest, res: Response) => {
+router.get('/search', scraperLimiter, protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
     const query = (req.query.q as string) || '';
     const limit = Math.min(Number(req.query.limit) || 12, 24);
@@ -23,20 +34,30 @@ router.get('/search', protect, adminOnly, async (req: AuthRequest, res: Response
 });
 
 /** GET /api/scraper/market?q=laptops&category=Laptops */
-router.get('/market', protect, adminOnly, (req: AuthRequest, res: Response) => {
-  const query = (req.query.q as string) || '';
-  const category = (req.query.category as string) || 'Accessories';
-  if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
-  res.json(analyzeMarket(query, category));
+router.get('/market', scraperLimiter, protect, adminOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const query = (req.query.q as string) || '';
+    const category = (req.query.category as string) || 'Accessories';
+    if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
+    const analysis = await analyzeMarket(query, category);
+    res.json(analysis);
+  } catch (err) {
+    res.status(500).json({ message: 'Market analysis failed', error: String(err) });
+  }
 });
 
 /** GET /api/scraper/suppliers?q=wireless headphones&category=Audio */
-router.get('/suppliers', protect, adminOnly, (req: AuthRequest, res: Response) => {
-  const query = (req.query.q as string) || '';
-  const category = (req.query.category as string) || 'Accessories';
-  const count = Math.min(Number(req.query.count) || 6, 10);
-  if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
-  res.json({ suppliers: findSuppliers(query, category, count), count });
+router.get('/suppliers', scraperLimiter, protect, adminOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const query = (req.query.q as string) || '';
+    const category = (req.query.category as string) || 'Accessories';
+    const count = Math.min(Number(req.query.count) || 6, 10);
+    if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
+    const suppliers = await findSuppliers(query, category, count);
+    res.json({ suppliers, count: suppliers.length });
+  } catch (err) {
+    res.status(500).json({ message: 'Supplier scraping failed', error: String(err) });
+  }
 });
 
 /** GET /api/scraper/optimize?name=Wireless Headphones&category=Audio */
