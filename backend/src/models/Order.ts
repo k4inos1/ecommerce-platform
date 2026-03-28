@@ -12,6 +12,8 @@ export interface IOrder extends Document {
   user: Types.ObjectId;
   items: IOrderItem[];
   totalAmount: number;
+  discountAmount: number;
+  couponCode?: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: {
     name?: string; street?: string; city?: string; region?: string;
@@ -50,6 +52,8 @@ const OrderSchema = new Schema<IOrder>(
     webpayToken: { type: String },
     paidAt: { type: Date },
     paymentMethod: { type: String, default: 'card' },
+    discountAmount: { type: Number, default: 0 },
+    couponCode: { type: String },
   },
   { timestamps: true }
 );

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { protect, AuthRequest } from '../middleware/auth';
 import { User } from '../models/User';
+import { Product } from '../models/Product';
 
 const router = Router();
 
@@ -48,6 +49,52 @@ router.put('/profile', protect, async (req: AuthRequest, res: Response) => {
       postalCode: updatedUser.postalCode,
       country: updatedUser.country,
     });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+// ─── Wishlist ────────────────────────────────────────────────────────────────
+
+// GET /api/users/wishlist — get current user's wishlist (populated)
+router.get('/wishlist', protect, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.id).populate('wishlist');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user.wishlist);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+// POST /api/users/wishlist/:productId — add product to wishlist
+router.post('/wishlist/:productId', protect, async (req: AuthRequest, res: Response) => {
+  try {
+    const product = await Product.findById(req.params.productId);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    const user = await User.findByIdAndUpdate(
+      req.user!.id,
+      { $addToSet: { wishlist: req.params.productId } },
+      { new: true }
+    ).populate('wishlist');
+
+    res.json({ message: 'Added to wishlist', wishlist: user?.wishlist });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+// DELETE /api/users/wishlist/:productId — remove product from wishlist
+router.delete('/wishlist/:productId', protect, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user!.id,
+      { $pull: { wishlist: req.params.productId } },
+      { new: true }
+    ).populate('wishlist');
+
+    res.json({ message: 'Removed from wishlist', wishlist: user?.wishlist });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
   }
