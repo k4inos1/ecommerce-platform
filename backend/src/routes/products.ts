@@ -12,16 +12,9 @@ const TTL = 60 * 1000; // 1 minute
 // GET /api/products — only published products for the store
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { search, category, page = 1, limit = 12, minPrice, maxPrice } = req.query;
-    
-    // Only cache the "all" results (no filters) for the first page
-    const isBaseQuery = !search && (!category || category === 'All') && Number(page) === 1 && !minPrice && !maxPrice;
-    if (isBaseQuery) {
-      const cached = CACHE.get('products_base');
-      if (cached && cached.exp > Date.now()) return res.json(cached.data);
-    }
+    const { search, category, minPrice, maxPrice, page = 1, limit = 12 } = req.query;
+    const query: Record<string, any> = { published: true };
 
-    const query: any = { published: true };
     if (search) query.$text = { $search: search as string };
     if (category && category !== 'All') query.category = category;
     
@@ -38,11 +31,7 @@ router.get('/', async (req: Request, res: Response) => {
       Product.countDocuments(query),
     ]);
 
-    const result = { products, total, page: Number(page), pages: Math.ceil(total / Number(limit)) };
-    
-    if (isBaseQuery) CACHE.set('products_base', { data: result, exp: Date.now() + TTL });
-
-    res.json(result);
+    res.json({ products, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
   }

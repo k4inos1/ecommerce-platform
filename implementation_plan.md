@@ -56,7 +56,39 @@
 
 ---
 
-## 📋 Sprint 5.0 — Roadmap (Pending)
+## ✅ Sprint 5.0 — Completed (develop branch)
+
+> Changes landed in branch `develop`.
+
+### 5.1 Social Login (OAuth2)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Google OAuth2 (`GET /api/auth/google`) | ✅ Done | Passport GoogleStrategy; JWT issued on callback; redirects to frontend with token |
+| Facebook OAuth2 (`GET /api/auth/facebook`) | ✅ Done | Passport FacebookStrategy; same JWT flow as Google |
+| Frontend social login buttons | ✅ Done | Login page shows "Continuar con Google" and "Continuar con Facebook" links |
+| OAuth error handling | ✅ Done | `failureRedirect` with `?error=oauth_failed`; error surfaced in login UI |
+
+### 5.2 Email Improvements
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Welcome email on registration | ✅ Done | `sendWelcomeEmail()` called async after `POST /api/auth/register`; skipped for guest accounts |
+| Premium corporate email templates | ✅ Done | Unified CSS layout with Unsplash banners, brand colours, styled tables — applied to order confirmation and welcome emails |
+
+### 5.3 Bug Fixes & Stability
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Express.User type mismatch with Passport | ✅ Done | Global `Express.User` interface extended to match app user shape |
+| Passport sync crash on missing OAuth keys | ✅ Done | Strategies only registered when `GOOGLE_CLIENT_ID` / `FACEBOOK_APP_ID` env vars are set |
+| Transbank SDK TS2554 constructor error | ✅ Done | Explicit options object passed to Transbank WebpayPlus constructor |
+| nixpacks `ca-certificates` → `cacert` | ✅ Done | Replaced Debian package name with Nix-compatible `cacert` in `nixpacks.toml` |
+| CI Node.js version bump | ✅ Done | GitHub Actions workflow updated to Node 20; removed `ttf-dejavu` from Nix packages |
+
+---
+
+## 📋 Sprint 6.0 — Roadmap (Pending)
 
 | Feature | Priority | Notes |
 |---------|----------|-------|

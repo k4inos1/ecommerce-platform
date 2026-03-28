@@ -55,7 +55,9 @@ export default function AdminImport() {
     try {
       const res = await fetch(url, { method, headers: authHeaders, ...(body ? { body: JSON.stringify(body) } : {}) });
       if (res.status === 401) { router.push('/admin/login'); return null; }
-      return await res.json();
+      const data = await res.json();
+      if (!res.ok) { setError(data.message || data.error || `Error ${res.status}`); return null; }
+      return data;
     } catch { setError('Error de conexión con el backend'); return null; }
     finally { setLoading(false); }
   }, [token]);
@@ -251,7 +253,20 @@ export default function AdminImport() {
                 </div>
 
                 {/* Summary */}
-                <div className="card p-5"><div className="text-xs text-gray-500 section-label mb-2">Resumen</div><p className="text-sm text-gray-300 leading-relaxed">{market.summary}</p></div>
+                <div className="card p-5">
+                  <div className="text-xs text-gray-500 section-label mb-2">Resumen</div>
+                  <p className="text-sm text-gray-300 leading-relaxed">{market.summary}</p>
+                  {market.sources?.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-white/[0.05]">
+                      <div className="text-[10px] text-gray-600 mb-1.5">Fuentes web consultadas:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {market.sources.map((src: string, i: number) => (
+                          <span key={i} className="text-[10px] text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full truncate max-w-[200px]">{src}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Seasonality chart */}
                 <div className="card p-5">

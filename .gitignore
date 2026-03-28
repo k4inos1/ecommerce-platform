@@ -33,7 +33,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Skills (agent context only, not committed)
-.agents/
+# Agent runtime / model context (not committed)
 ecommerce-product-pro/
 **/SKILL.md

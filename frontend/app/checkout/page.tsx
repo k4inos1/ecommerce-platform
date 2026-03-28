@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import { Lock, CreditCard, Truck, CheckCircle, ArrowRight, ExternalLink } from 'lucide-react';
+import { Lock, CreditCard, Truck, CheckCircle, ArrowRight, Tag, Check, X } from 'lucide-react';
+import { validateCoupon } from '@/lib/api';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -21,8 +22,36 @@ export default function CheckoutPage() {
     card: '', expiry: '', cvv: '',
   });
 
+  // ── Coupon state ─────────────────────────────────────────────────────────
+  const [couponInput, setCouponInput] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string; type: string; discount: number; discountAmount: number;
+  } | null>(null);
+
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setCouponLoading(true);
+    setCouponError('');
+    try {
+      const data = await validateCoupon(couponInput.trim(), total + (total >= 99 ? 0 : 9.99));
+      setAppliedCoupon(data);
+      setCouponInput('');
+    } catch (e: unknown) {
+      setCouponError(e instanceof Error ? e.message : 'Cupón inválido');
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => { setAppliedCoupon(null); setCouponError(''); };
+
   const shipping = total >= 99 ? 0 : 9.99;
-  const finalTotal = total + shipping;
+  const subtotalWithShipping = total + shipping;
+  const discountAmount = appliedCoupon?.discountAmount ?? 0;
+  const finalTotal = Math.max(0, subtotalWithShipping - discountAmount);
   const [stripeLoading, setStripeLoading] = useState(false);
 
   // ── Stripe Checkout: save order then redirect to Stripe ──────────────
@@ -49,6 +78,8 @@ export default function CheckoutPage() {
           shippingAddress: { name: form.name, street: form.street, city: form.city, region: form.region, postal: form.postal, country: form.country, phone: form.phone },
           paymentMethod: 'stripe',
           totalAmount: finalTotal,
+          discountAmount: discountAmount || 0,
+          couponCode: appliedCoupon?.code,
         }),
       });
       const order = await orderRes.json();
@@ -90,6 +121,8 @@ export default function CheckoutPage() {
           shippingAddress: { name: form.name, street: form.street, city: form.city, region: form.region, postal: form.postal, country: form.country, phone: form.phone },
           paymentMethod: 'webpay',
           totalAmount: finalTotal,
+          discountAmount: discountAmount || 0,
+          couponCode: appliedCoupon?.code,
         }),
       });
       const order = await orderRes.json();
@@ -175,6 +208,8 @@ export default function CheckoutPage() {
           shippingAddress: { name: form.name, street: form.street, city: form.city, region: form.region, postal: form.postal, country: form.country, phone: form.phone },
           paymentMethod: 'card_simulated',
           totalAmount: finalTotal,
+          discountAmount: discountAmount || 0,
+          couponCode: appliedCoupon?.code,
         }),
       });
 
@@ -302,9 +337,51 @@ export default function CheckoutPage() {
             ))}
           </div>
           <div className="h-px bg-white/[0.06]" />
+          {/* ── Coupon ── */}
+          {appliedCoupon ? (
+            <div className="flex items-center justify-between bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2.5 text-sm">
+              <div className="flex items-center gap-2 text-green-400">
+                <Check className="w-4 h-4" />
+                <span className="font-mono font-bold">{appliedCoupon.code}</span>
+                <span className="text-green-500/80 text-xs">
+                  {appliedCoupon.type === 'percentage' ? `-${appliedCoupon.discount}%` : `-$${appliedCoupon.discount}`}
+                </span>
+              </div>
+              <button onClick={removeCoupon} className="text-gray-500 hover:text-red-400 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                  <input
+                    value={couponInput}
+                    onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                    placeholder="CÓDIGO DE DESCUENTO"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl pl-8 pr-3 py-2.5 text-xs text-white placeholder-gray-600 font-mono focus:border-indigo-500 focus:outline-none uppercase"
+                  />
+                </div>
+                <button
+                  onClick={handleApplyCoupon}
+                  disabled={couponLoading || !couponInput.trim()}
+                  className="px-3 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600/80 hover:bg-indigo-600 text-white transition-colors disabled:opacity-50"
+                >
+                  {couponLoading ? <div className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" /> : 'Aplicar'}
+                </button>
+              </div>
+              {couponError && <p className="text-red-400 text-xs">{couponError}</p>}
+            </div>
+          )}
+          <div className="h-px bg-white/[0.06]" />
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-gray-400"><span>Subtotal</span><span>${total.toFixed(2)}</span></div>
             <div className="flex justify-between text-gray-400"><span>Envío</span><span className={shipping === 0 ? 'text-green-400' : ''}>{shipping === 0 ? 'Gratis' : `$${shipping}`}</span></div>
+            {appliedCoupon && (
+              <div className="flex justify-between text-green-400"><span>Descuento</span><span>-${discountAmount.toFixed(2)}</span></div>
+            )}
           </div>
           <div className="flex justify-between font-bold text-white">
             <span>Total</span><span className="text-indigo-400 text-lg">${finalTotal.toFixed(2)}</span>

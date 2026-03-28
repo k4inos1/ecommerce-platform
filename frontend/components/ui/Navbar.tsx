@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingCart, Menu, X, Zap, User, Package, LogOut } from 'lucide-react';
+import { ShoppingCart, Menu, X, Zap, User, Package, LogOut, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 import { useState, useEffect, useRef } from 'react';
 
 export function Navbar() {
   const { items } = useCart();
+  const { wishlistIds } = useWishlist();
   const count = items.reduce((s, i) => s + i.quantity, 0);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -110,6 +112,17 @@ export function Navbar() {
                     <Package className="w-4 h-4 text-indigo-400" /> Mis Órdenes
                   </Link>
                   <div className="h-px bg-white/[0.06]" />
+                  <Link href="/wishlist" onClick={() => setUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors">
+                    <Heart className="w-4 h-4 text-pink-400" />
+                    Favoritos
+                    {wishlistIds.size > 0 && (
+                      <span className="ml-auto bg-pink-500/20 text-pink-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-pink-500/30">
+                        {wishlistIds.size}
+                      </span>
+                    )}
+                  </Link>
+                  <div className="h-px bg-white/[0.06]" />
                   <button onClick={handleLogout}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors">
                     <LogOut className="w-4 h-4" /> Cerrar sesión
@@ -133,7 +146,7 @@ export function Navbar() {
       {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden bg-[#080810]/95 backdrop-blur-xl border-b border-white/5 px-4 pb-4">
-          {[...navLinks, ...(userName ? [{ href: '/profile', label: 'Mi Perfil' }, { href: '/mis-ordenes', label: 'Mis Órdenes' }] : [{ href: '/login', label: 'Iniciar Sesión' }])].map(l => (
+          {[...navLinks, ...(userName ? [{ href: '/profile', label: 'Mi Perfil' }, { href: '/mis-ordenes', label: 'Mis Órdenes' }, { href: '/wishlist', label: 'Favoritos' }] : [{ href: '/login', label: 'Iniciar Sesión' }])].map(l => (
             <Link key={l.href} href={l.href} onClick={() => setMenuOpen(false)}
               className="block py-3 text-sm text-gray-400 hover:text-white border-b border-white/5 last:border-0 transition-colors">
               {l.label}

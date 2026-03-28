@@ -12,12 +12,15 @@ export interface IOrder extends Document {
   user: Types.ObjectId;
   items: IOrderItem[];
   totalAmount: number;
+  discountAmount: number;
+  couponCode?: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: {
     name?: string; street?: string; city?: string; region?: string;
     postal?: string; country?: string; phone?: string;
   };
   stripeSessionId?: string;
+  webpayToken?: string;
   paidAt?: Date;
   paymentMethod?: string;
   createdAt: Date;
@@ -46,8 +49,11 @@ const OrderSchema = new Schema<IOrder>(
       postal: String, country: String, phone: String,
     },
     stripeSessionId: { type: String },
+    webpayToken: { type: String },
     paidAt: { type: Date },
     paymentMethod: { type: String, default: 'card' },
+    discountAmount: { type: Number, default: 0 },
+    couponCode: { type: String },
   },
   { timestamps: true }
 );
