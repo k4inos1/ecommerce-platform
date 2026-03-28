@@ -25,7 +25,7 @@ router.get('/', async (req: Request, res: Response) => {
     if (search) query.$text = { $search: search as string };
     if (category && category !== 'All') query.category = category;
     
-    // Price filters
+    // Price filtering
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = Number(minPrice);
@@ -57,6 +57,24 @@ router.get('/:id', async (req: Request, res: Response) => {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+// GET /api/products/:id/related — products in same category (excluding self)
+router.get('/:id/related', async (req: Request, res: Response) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    const related = await Product.find({
+      category: product.category,
+      _id: { $ne: product._id },
+      published: true,
+    })
+      .limit(4)
+      .sort({ createdAt: -1 });
+    res.json(related);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
   }

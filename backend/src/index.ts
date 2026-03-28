@@ -13,6 +13,7 @@ import reviewRoutes from './routes/reviews';
 import scraperRoutes from './routes/scraper';
 import stripeRoutes from './routes/stripe';
 import transbankRoutes from './routes/transbank';
+import couponRoutes from './routes/coupons';
 import supportRoutes from './routes/support';
 
 dotenv.config();
@@ -51,6 +52,8 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/scraper', scraperRoutes);
 app.use('/api/stripe', stripeRoutes);
 app.use('/api/transbank', transbankRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/support', supportRoutes);
 
 // Health check — always responds, even without DB
 app.get('/api/health', (_req, res) => {
