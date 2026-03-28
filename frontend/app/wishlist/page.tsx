@@ -1,96 +1,75 @@
 'use client';
 
-import Link from 'next/link';
-import { Heart, ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
-import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
-
-const EMOJI: Record<string, string> = {
-  Laptops: '💻', Phones: '📱', Audio: '🎧', Tablets: '🖥️',
-  Wearables: '⌚', Monitors: '🖵', Accessories: '🔧',
-};
+import { ProductCard } from '@/components/ui/ProductCard';
+import { Heart, shopping_cart as ShoppingCartIcon, ArrowRight, PackageOpen } from 'lucide-react';
+import Link from 'next/link';
 
 export default function WishlistPage() {
-  const { addItem } = useCart();
-  const { wishlistItems, toggle, loading } = useWishlist();
+  const { wishlistItems, loading } = useWishlist();
 
-  const handleAdd = (p: { _id: string; name: string; price: number; image: string; category: string }) => {
-    addItem({ id: p._id, name: p.name, price: p.price, image: p.image || EMOJI[p.category] || '📦' });
-  };
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-24 text-center">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-gray-400 font-medium">Cargando tus favoritos...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
-      <Link href="/products" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors mb-8">
-        <ArrowLeft className="w-4 h-4" /> Volver a productos
-      </Link>
-
-      <div className="flex items-end justify-between mb-8">
+    <div className="max-w-6xl mx-auto px-4 py-12 lg:py-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
         <div>
-          <p className="section-label mb-1">Mi lista</p>
-          <h1 className="text-3xl font-display font-bold text-white flex items-center gap-3">
-            <Heart className="w-7 h-7 text-pink-400 fill-pink-400" /> Favoritos
-          </h1>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-[10px] font-bold text-pink-400 uppercase tracking-widest mb-4">
+            <Heart className="w-3 h-3 fill-current" /> Tu Selección
+          </div>
+          <h1 className="text-4xl lg:text-5xl font-display font-black text-white">Mis Favoritos</h1>
+          <p className="text-gray-400 mt-2 text-lg">Los productos que más te gustan, guardados en un solo lugar.</p>
         </div>
-        {!loading && (
-          <p className="text-sm text-gray-500">{wishlistItems.length} producto{wishlistItems.length !== 1 ? 's' : ''}</p>
+        
+        {wishlistItems.length > 0 && (
+          <div className="text-sm text-gray-500 font-medium">
+            Mostrando <span className="text-white font-bold">{wishlistItems.length}</span> productos
+          </div>
         )}
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="card p-4 animate-pulse">
-              <div className="aspect-square rounded-xl bg-white/[0.03] mb-4" />
-              <div className="h-3 bg-white/[0.03] rounded mb-2 w-2/3" />
-              <div className="h-4 bg-white/[0.03] rounded mb-3" />
-              <div className="h-6 bg-white/[0.03] rounded w-1/3" />
-            </div>
-          ))}
-        </div>
-      ) : wishlistItems.length === 0 ? (
-        <div className="text-center py-24">
-          <Heart className="w-16 h-16 text-gray-700 mx-auto mb-6" />
-          <p className="text-xl font-semibold text-white mb-2">Tu lista de favoritos está vacía</p>
-          <p className="text-gray-500 mb-8">Guarda los productos que te gustan para comprarlos después.</p>
-          <Link href="/products" className="btn-primary">Explorar productos</Link>
+      {wishlistItems.length === 0 ? (
+        <div className="card p-12 md:p-20 text-center bg-white/[0.02] border-white/[0.05]">
+          <div className="w-20 h-20 bg-white/[0.03] border border-white/[0.07] rounded-3xl flex items-center justify-center mx-auto mb-8">
+            <PackageOpen className="w-10 h-10 text-gray-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-4">Tu lista está vacía</h2>
+          <p className="text-gray-400 max-w-sm mx-auto mb-10 leading-relaxed">
+            Parece que aún no has guardado ningún producto. ¡Explora nuestro catálogo y encuentra algo increíble!
+          </p>
+          <Link href="/products" className="btn-primary px-8 py-4 inline-flex items-center gap-2">
+            Ver catálogo <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-          {wishlistItems.map(p => (
-            <div key={p._id} className="card flex flex-col hover:border-pink-500/30 hover:-translate-y-1 transition-all duration-200">
-              <Link href={`/products/${p._id}`} className="flex flex-col flex-1 p-4">
-                <div className="aspect-square rounded-xl bg-white/[0.03] overflow-hidden flex items-center justify-center mb-4">
-                  {p.image?.startsWith('http') ? (
-                    <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-4xl">{EMOJI[p.category] || '📦'}</span>
-                  )}
-                </div>
-                <div className="text-[11px] text-gray-500 mb-1">{p.category}</div>
-                <div className="font-medium text-white text-sm leading-snug mb-2 line-clamp-2 hover:text-pink-300 transition-colors">{p.name}</div>
-                <div className="mt-auto">
-                  <span className="text-indigo-400 font-bold text-lg">${p.price.toLocaleString()}</span>
-                </div>
-              </Link>
-              <div className="p-3 pt-0 flex gap-2">
-                <button
-                  onClick={() => handleAdd(p)}
-                  disabled={p.stock === 0}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${p.stock === 0 ? 'bg-white/5 text-gray-600 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
-                >
-                  <ShoppingCart className="w-4 h-4" />
-                  {p.stock === 0 ? 'Agotado' : 'Agregar'}
-                </button>
-                <button
-                  onClick={() => toggle(p._id)}
-                  className="p-2.5 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all"
-                  title="Quitar de favoritos"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {wishlistItems.map((p) => (
+            <ProductCard key={p._id} p={p} />
           ))}
+        </div>
+      )}
+
+      {/* ── Suggested Section ────────────────────────────────── */}
+      {wishlistItems.length > 0 && wishlistItems.length < 4 && (
+        <div className="mt-24 p-8 rounded-3xl bg-indigo-600/5 border border-indigo-500/10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-[60px] pointer-events-none" />
+          <div className="relative flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-center md:text-left">
+              <h3 className="text-xl font-bold text-white mb-2">¿Buscas algo más?</h3>
+              <p className="text-gray-400 text-sm">Sigue explorando nuestras categorías más populares.</p>
+            </div>
+            <div className="flex gap-3">
+              <Link href="/products?category=Audio" className="btn-ghost text-xs px-5 py-2.5">Audio</Link>
+              <Link href="/products?category=Laptops" className="btn-ghost text-xs px-5 py-2.5">Laptops</Link>
+            </div>
+          </div>
         </div>
       )}
     </div>

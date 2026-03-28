@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ShoppingCart, Star, Shield, Truck, RotateCcw, Plus, Minus, Check, Zap } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Star, Shield, Truck, RotateCcw, Plus, Minus, Check, Zap, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 import { ReviewSection } from '@/components/ui/ReviewSection';
+import { ProductCard } from '@/components/ui/ProductCard';
+import { getRelatedProducts } from '@/lib/api';
 
 const EMOJI: Record<string, string> = { Laptops: '💻', Phones: '📱', Audio: '🎧', Tablets: '🖥️', Wearables: '⌚', Monitors: '🖵', Accessories: '🔧' };
 
@@ -12,9 +15,11 @@ interface Product { _id: string; name: string; price: number; image: string; cat
 
 export function ProductClient({ product }: { product: Product }) {
   const { addItem } = useCart();
+  const { toggle, isInWishlist } = useWishlist();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [timeLeft, setTimeLeft] = useState('04:59:59');
+  const [related, setRelated] = useState<Product[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -25,6 +30,11 @@ export function ProductClient({ product }: { product: Product }) {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    getRelatedProducts(product._id).then(setRelated).catch(() => setRelated([]));
+  }, [product._id]);
+
+
   const handleAdd = () => {
     for (let i = 0; i < qty; i++) {
       addItem({ id: product._id, name: product.name, price: product.price, image: product.image || EMOJI[product.category] || '📦' });
@@ -34,6 +44,7 @@ export function ProductClient({ product }: { product: Product }) {
   };
 
   const isImg = product.image?.startsWith('http');
+  const inWishlist = isInWishlist(product._id);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
@@ -120,6 +131,12 @@ export function ProductClient({ product }: { product: Product }) {
                   {added ? <Check className="w-5 h-5" /> : <ShoppingCart className="w-5 h-5" />}
                   {added ? 'Agregado ✓' : 'Comprar Ahora'}
                 </button>
+                {/* Wishlist Toggle Button */}
+                <button 
+                  onClick={() => toggle(product._id)}
+                  className={`w-[60px] flex items-center justify-center rounded-2xl border transition-all ${inWishlist ? 'bg-pink-600/10 border-pink-500/30 text-pink-500' : 'bg-white/5 border-white/10 text-gray-500 hover:text-pink-500 hover:bg-pink-500/5'}`}>
+                  <Heart className={`w-6 h-6 ${inWishlist ? 'fill-current animate-pulse' : ''}`} />
+                </button>
               </div>
             )}
 
@@ -140,6 +157,26 @@ export function ProductClient({ product }: { product: Product }) {
           </div>
         </div>
       </div>
+      {/* ── Related Products ────────────────────────────────── */}
+      {related.length > 0 && (
+        <div className="mt-32">
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <p className="section-label mb-2 text-indigo-400">Te puede interesar</p>
+              <h2 className="text-3xl font-display font-bold text-white">Productos Relacionados</h2>
+            </div>
+            <Link href="/products" className="btn-ghost hidden sm:inline-flex text-xs">
+              Ver catálogo completo
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {related.map(p => (
+              <ProductCard key={p._id} p={p} />
+            ))}
+          </div>
+        </div>
+      )}
+
 
       <div className="mt-20 pt-10 border-t border-white/5">
         <ReviewSection productId={product._id} />
