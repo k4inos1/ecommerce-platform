@@ -76,8 +76,18 @@ router.get('/:id', protect, async (req: AuthRequest, res: Response) => {
 router.patch('/:id/status', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.body;
-    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true }).populate('user', 'name email');
     if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // Trigger email if status is "shipped"
+    if (status === 'shipped' && order.user && (order.user as any).email) {
+      const u = order.user as any;
+      import('../services/email').then(m => {
+        m.sendOrderShippedEmail(u.email, u.name || 'Cliente', String(order._id))
+          .catch(e => console.warn('Shipping email failed:', e.message));
+      });
+    }
+
     res.json(order);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });

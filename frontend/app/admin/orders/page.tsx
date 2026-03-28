@@ -156,7 +156,7 @@ export default function AdminOrders() {
                     </div>
                   )}
 
-                  {order.stripeSessionId && (
+                  {(order.stripeSessionId || (order as any).webpayToken) && (
                     <div>
                       <div className="text-xs text-gray-500 uppercase font-mono mb-3 flex items-center gap-2">
                         <CreditCard className="w-3.5 h-3.5" /> Transacción
@@ -168,7 +168,9 @@ export default function AdminOrders() {
                         </div>
                         <div className="flex justify-between items-center text-xs mt-2">
                           <span className="text-gray-500">ID Ref</span>
-                          <span className="text-gray-400 font-mono truncate max-w-[200px]" title={order.stripeSessionId}>{order.stripeSessionId}</span>
+                          <span className="text-gray-400 font-mono truncate max-w-[200px]" title={order.stripeSessionId || (order as any).webpayToken}>
+                            {order.stripeSessionId || (order as any).webpayToken}
+                          </span>
                         </div>
                       </div>
                     </div>

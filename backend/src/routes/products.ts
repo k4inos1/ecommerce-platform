@@ -109,4 +109,22 @@ router.delete('/:id', protect, adminOnly, async (req: AuthRequest, res: Response
   }
 });
 
+// GET /api/products/admin/insights — admin: get market analysis and suppliers
+router.get('/admin/insights', protect, adminOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const { query, category } = req.query;
+    if (!query || !category) return res.status(400).json({ message: 'Missing query or category' });
+
+    const { analyzeMarket } = await import('../services/marketAnalysis');
+    const { findSuppliers } = await import('../services/supplierFinder');
+
+    const analysis = analyzeMarket(query as string, category as string);
+    const suppliers = findSuppliers(query as string, category as string);
+
+    res.json({ analysis, suppliers });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
 export default router;
