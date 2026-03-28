@@ -1,61 +1,42 @@
-import { Router, Request, Response } from 'express';
-import { WebpayPlus, Options, IntegrationCommerceCodes, IntegrationApiKeys, Environment } from 'transbank-sdk';
+import { Router, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { Order } from '../models/Order';
 import { protect, AuthRequest } from '../middleware/auth';
+import { createTransbankTransaction, confirmTransbankTransaction } from '../services/payment';
 
 const router = Router();
 
-// Transbank test credentials (public, official from Transbank developers)
-// For production, set env vars: TRANSBANK_COMMERCE_CODE + TRANSBANK_API_KEY
-const isProduction = process.env.NODE_ENV === 'production' && process.env.TRANSBANK_COMMERCE_CODE;
-
-// Helper to get integration options
-const getIntegrationOptions = () => new Options(
-  IntegrationCommerceCodes.WEBPAY_PLUS,
-  IntegrationApiKeys.WEBPAY,
-  Environment.Integration
-);
+// Payment endpoints — rate-limited to prevent brute-force and abuse
+const paymentLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Demasiadas solicitudes de pago. Espera un momento e intenta de nuevo.' },
+});
 
 // POST /api/transbank/create — Initiate WebPay Plus transaction
-router.post('/create', protect, async (req: AuthRequest, res: Response) => {
+router.post('/create', paymentLimiter, protect, async (req: AuthRequest, res: Response) => {
   try {
-    const { items, shippingAddress, orderId, totalAmount } = req.body;
+    const { orderId, totalAmount } = req.body;
     if (!totalAmount) return res.status(400).json({ message: 'No amount provided' });
 
     const origin = req.headers.origin || process.env.CLIENT_URL || 'http://localhost:3000';
     const returnUrl = `${origin}/checkout/transbank-result`;
-    const buyOrder = `ORDER-${orderId || Date.now()}`.slice(0, 26);
-    const sessionId = `SES-${req.user!.id}-${Date.now()}`.slice(0, 61);
-    const amount = Math.round(totalAmount); // WebPay requires integer (CLP)
 
-    let token: string, url: string;
-
-    if (isProduction) {
-      // Production: use real credentials from env
-      const tx = new WebpayPlus.Transaction(
-        new Options(
-          process.env.TRANSBANK_COMMERCE_CODE!,
-          process.env.TRANSBANK_API_KEY!,
-          Environment.Production
-        )
-      );
-      const resp = await tx.create(buyOrder, sessionId, amount, returnUrl);
-      token = resp.token;
-      url = resp.url;
-    } else {
-      // Integration (test) mode — Transbank public test credentials
-      const tx = new WebpayPlus.Transaction(getIntegrationOptions());
-      const resp = await tx.create(buyOrder, sessionId, amount, returnUrl);
-      token = resp.token;
-      url = resp.url;
-    }
+    const result = await createTransbankTransaction({
+      totalAmount,
+      orderId: orderId || String(Date.now()),
+      userId: req.user!.id,
+      returnUrl,
+    });
 
     // Store the transbank token in the order
     if (orderId) {
-      await Order.findByIdAndUpdate(orderId, { webpayToken: token, paymentMethod: 'webpay' });
+      await Order.findByIdAndUpdate(orderId, { webpayToken: result.token, paymentMethod: 'webpay' });
     }
 
-    res.json({ token, url });
+    res.json({ token: result.token, url: result.url });
   } catch (err: unknown) {
     console.error('Transbank create error:', err);
     res.status(500).json({ message: 'WebPay error', error: String(err) });
@@ -63,27 +44,22 @@ router.post('/create', protect, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/transbank/confirm — Called by frontend after redirect back from WebPay
-router.post('/confirm', protect, async (req: AuthRequest, res: Response) => {
+router.post('/confirm', paymentLimiter, protect, async (req: AuthRequest, res: Response) => {
   try {
     const { token_ws } = req.body;
     if (!token_ws) return res.status(400).json({ message: 'No token_ws' });
 
-    const tx = new (WebpayPlus as any).Transaction(isProduction ? new Options(
-      process.env.TRANSBANK_COMMERCE_CODE!,
-      process.env.TRANSBANK_API_KEY!,
-      Environment.Production
-    ) : getIntegrationOptions());
-    const response = await tx.commit(token_ws);
+    const result = await confirmTransbankTransaction(token_ws);
 
-    if (response.response_code === 0) {
+    if (result.success) {
       // Payment approved — find order by token and mark as processing
       await Order.findOneAndUpdate(
         { webpayToken: token_ws },
         { status: 'processing', paidAt: new Date() }
       );
-      res.json({ success: true, response });
+      res.json({ success: true, response: result.response });
     } else {
-      res.json({ success: false, response_code: response.response_code });
+      res.json({ success: false, response_code: (result.response as Record<string, unknown>).response_code });
     }
   } catch (err) {
     console.error('Transbank confirm error:', err);
