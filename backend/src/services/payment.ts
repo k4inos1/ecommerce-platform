@@ -8,9 +8,26 @@ import { WebpayPlus, Options, IntegrationCommerceCodes, IntegrationApiKeys, Envi
 // ─── Stripe ─────────────────────────────────────────────────────────────────
 
 if (!process.env.STRIPE_SECRET_KEY && process.env.NODE_ENV === 'production') {
-  throw new Error('STRIPE_SECRET_KEY environment variable is required in production');
+  console.error(
+    'CRITICAL: STRIPE_SECRET_KEY is not set in production. All payment operations will fail. ' +
+    'This must be configured before accepting live payments.'
+  );
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+
+let _stripe: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!_stripe) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      throw new Error(
+        'STRIPE_SECRET_KEY is not configured. Set this environment variable to enable Stripe payments.'
+      );
+    }
+    _stripe = new Stripe(key);
+  }
+  return _stripe;
+}
 
 export interface StripeCheckoutItem {
   name: string;
@@ -52,7 +69,7 @@ export async function createStripeCheckoutSession(
     quantity: item.quantity,
   }));
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     payment_method_types: ['card'],
     line_items: lineItems,
     mode: 'payment',
@@ -78,7 +95,7 @@ export function constructStripeWebhookEvent(
   secret?: string
 ): Stripe.Event {
   if (secret) {
-    return stripe.webhooks.constructEvent(rawBody, signature, secret);
+    return getStripe().webhooks.constructEvent(rawBody, signature, secret);
   }
   // Dev-mode: skip signature verification
   return JSON.parse(rawBody.toString()) as Stripe.Event;
