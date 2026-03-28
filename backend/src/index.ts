@@ -13,6 +13,7 @@ import reviewRoutes from './routes/reviews';
 import scraperRoutes from './routes/scraper';
 import stripeRoutes from './routes/stripe';
 import transbankRoutes from './routes/transbank';
+import supportRoutes from './routes/support';
 
 dotenv.config();
 

@@ -6,14 +6,31 @@ const router = Router();
 
 // ─── PUBLIC ─────────────────────────────────────────────────────────────────
 
+const CACHE = new Map<string, { data: any; exp: number }>();
+const TTL = 60 * 1000; // 1 minute
+
 // GET /api/products — only published products for the store
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { search, category, page = 1, limit = 12 } = req.query;
-    const query: Record<string, unknown> = { published: true };
+    const { search, category, page = 1, limit = 12, minPrice, maxPrice } = req.query;
+    
+    // Only cache the "all" results (no filters) for the first page
+    const isBaseQuery = !search && (!category || category === 'All') && Number(page) === 1 && !minPrice && !maxPrice;
+    if (isBaseQuery) {
+      const cached = CACHE.get('products_base');
+      if (cached && cached.exp > Date.now()) return res.json(cached.data);
+    }
 
+    const query: any = { published: true };
     if (search) query.$text = { $search: search as string };
     if (category && category !== 'All') query.category = category;
+    
+    // Price filters
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const [products, total] = await Promise.all([
@@ -21,11 +38,18 @@ router.get('/', async (req: Request, res: Response) => {
       Product.countDocuments(query),
     ]);
 
-    res.json({ products, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    const result = { products, total, page: Number(page), pages: Math.ceil(total / Number(limit)) };
+    
+    if (isBaseQuery) CACHE.set('products_base', { data: result, exp: Date.now() + TTL });
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
   }
 });
+
+// Helper to clear cache
+export const clearProductCache = () => CACHE.delete('products_base');
 
 // GET /api/products/:id — public
 router.get('/:id', async (req: Request, res: Response) => {
@@ -66,6 +90,7 @@ router.get('/admin/all', protect, adminOnly, async (req: AuthRequest, res: Respo
 router.post('/', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.create({ published: true, source: 'manual', ...req.body });
+    clearProductCache();
     res.status(201).json(product);
   } catch (err) {
     res.status(400).json({ message: 'Invalid data', error: err });
@@ -77,6 +102,7 @@ router.put('/:id', protect, adminOnly, async (req: AuthRequest, res: Response) =
   try {
     const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!product) return res.status(404).json({ message: 'Product not found' });
+    clearProductCache();
     res.json(product);
   } catch (err) {
     res.status(400).json({ message: 'Invalid data', error: err });
@@ -93,6 +119,7 @@ router.patch('/:id/publish', protect, adminOnly, async (req: AuthRequest, res: R
       { new: true }
     );
     if (!product) return res.status(404).json({ message: 'Product not found' });
+    clearProductCache();
     res.json({ message: `Product ${published ? 'published' : 'unpublished'}`, product });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
@@ -103,6 +130,7 @@ router.patch('/:id/publish', protect, adminOnly, async (req: AuthRequest, res: R
 router.delete('/:id', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
     await Product.findByIdAndDelete(req.params.id);
+    clearProductCache();
     res.json({ message: 'Product removed' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
