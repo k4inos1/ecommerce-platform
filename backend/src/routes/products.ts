@@ -45,6 +45,24 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/products/:id/related — products in same category (excluding self)
+router.get('/:id/related', async (req: Request, res: Response) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    const related = await Product.find({
+      category: product.category,
+      _id: { $ne: product._id },
+      published: true,
+    })
+      .limit(4)
+      .sort({ createdAt: -1 });
+    res.json(related);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
 // ─── ADMIN ──────────────────────────────────────────────────────────────────
 
 // GET /api/products/admin/all — ALL products (published + drafts) for admin panel

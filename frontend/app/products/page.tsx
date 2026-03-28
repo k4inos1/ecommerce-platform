@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { Search, SlidersHorizontal, ShoppingCart, Check, Star, X } from 'lucide-react';
+import { Search, SlidersHorizontal, ShoppingCart, Check, Star, X, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -20,6 +21,7 @@ interface Product { _id: string; name: string; price: number; image: string; cat
 
 function ProductsContent() {
   const { addItem } = useCart();
+  const { isInWishlist, toggle: toggleWishlist } = useWishlist();
   const router = useRouter();
   const params = useSearchParams();
 
@@ -216,10 +218,17 @@ function ProductsContent() {
                   </span>
                 </div>
               </Link>
-              <div className="p-3 pt-0">
+              <div className="p-3 pt-0 flex gap-2">
                 <button onClick={() => handleAdd(p)} disabled={p.stock === 0}
-                  className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${added === p._id ? 'bg-green-600 text-white' : p.stock === 0 ? 'bg-white/5 text-gray-600 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/30'}`}>
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${added === p._id ? 'bg-green-600 text-white' : p.stock === 0 ? 'bg-white/5 text-gray-600 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/30'}`}>
                   {added === p._id ? <><Check className="w-4 h-4" /> Agregado</> : <><ShoppingCart className="w-4 h-4" /> Agregar</>}
+                </button>
+                <button
+                  onClick={(e) => { e.preventDefault(); toggleWishlist(p._id); }}
+                  className={`p-2.5 rounded-xl border transition-all ${isInWishlist(p._id) ? 'bg-pink-500/20 border-pink-500/40 text-pink-400' : 'border-white/10 text-gray-500 hover:text-pink-400 hover:border-pink-500/30'}`}
+                  title={isInWishlist(p._id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                >
+                  <Heart className={`w-4 h-4 ${isInWishlist(p._id) ? 'fill-pink-400' : ''}`} />
                 </button>
               </div>
             </div>

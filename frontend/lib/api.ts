@@ -70,7 +70,97 @@ export async function deleteProduct(id: string) {
   if (!res.ok) throw new Error('Error al eliminar producto');
 }
 
-// ─── Orders ───────────────────────────────────────────────
+// ─── Wishlist ─────────────────────────────────────────────
+export function getUserToken() {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('userToken') || localStorage.getItem('adminToken');
+}
+
+function userAuthHeaders(): Record<string, string> {
+  const token = getUserToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
+export async function getWishlist() {
+  const res = await fetch(`${API_URL}/api/users/wishlist`, { headers: userAuthHeaders() });
+  if (!res.ok) throw new Error('Error al cargar wishlist');
+  return res.json();
+}
+
+export async function addToWishlist(productId: string) {
+  const res = await fetch(`${API_URL}/api/users/wishlist/${productId}`, {
+    method: 'POST',
+    headers: userAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Error al agregar a wishlist');
+  return res.json();
+}
+
+export async function removeFromWishlist(productId: string) {
+  const res = await fetch(`${API_URL}/api/users/wishlist/${productId}`, {
+    method: 'DELETE',
+    headers: userAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Error al eliminar de wishlist');
+  return res.json();
+}
+
+// ─── Coupons ──────────────────────────────────────────────
+export async function validateCoupon(code: string, cartTotal: number) {
+  const res = await fetch(`${API_URL}/api/coupons/validate`, {
+    method: 'POST',
+    headers: userAuthHeaders(),
+    body: JSON.stringify({ code, cartTotal }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Cupón inválido');
+  return data;
+}
+
+// ─── Admin Coupons ─────────────────────────────────────────
+export async function getCoupons() {
+  const res = await fetch(`${API_URL}/api/coupons`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Error al cargar cupones');
+  return res.json();
+}
+
+export async function createCoupon(data: object) {
+  const res = await fetch(`${API_URL}/api/coupons`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.message || 'Error al crear cupón');
+  return json;
+}
+
+export async function updateCoupon(id: string, data: object) {
+  const res = await fetch(`${API_URL}/api/coupons/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Error al actualizar cupón');
+  return res.json();
+}
+
+export async function deleteCoupon(id: string) {
+  const res = await fetch(`${API_URL}/api/coupons/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error('Error al eliminar cupón');
+}
+
+// ─── Related products ─────────────────────────────────────
+export async function getRelatedProducts(id: string) {
+  const res = await fetch(`${API_URL}/api/products/${id}/related`);
+  if (!res.ok) return [];
+  return res.json();
+}
 export async function getOrders() {
   const res = await fetch(`${API_URL}/api/orders`, { headers: authHeaders() });
   if (!res.ok) throw new Error('Error al cargar órdenes');

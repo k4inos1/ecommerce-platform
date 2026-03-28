@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, model } from 'mongoose';
+import mongoose, { Schema, Document, Types, model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 export interface IUser extends Document {
@@ -11,6 +11,7 @@ export interface IUser extends Document {
   city?: string;
   postalCode?: string;
   country?: string;
+  wishlist: Types.ObjectId[];
   resetPasswordToken?: string;
   resetPasswordExpire?: Date;
   createdAt: Date;
@@ -28,6 +29,7 @@ const UserSchema = new Schema<IUser>(
     city: { type: String },
     postalCode: { type: String },
     country: { type: String },
+    wishlist: [{ type: Schema.Types.ObjectId, ref: 'Product' }],
     resetPasswordToken: String,
     resetPasswordExpire: Date,
   },

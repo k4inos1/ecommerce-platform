@@ -3,13 +3,14 @@ import { Order } from '../models/Order';
 import { protect, adminOnly, AuthRequest } from '../middleware/auth';
 import { sendOrderConfirmation } from '../services/email';
 import { User } from '../models/User';
+import { Coupon } from '../models/Coupon';
 
 const router = Router();
 
 // POST /api/orders - Create order (authenticated users)
 router.post('/', protect, async (req: AuthRequest, res: Response) => {
   try {
-    const { items, shippingAddress, paymentMethod, totalAmount } = req.body;
+    const { items, shippingAddress, paymentMethod, totalAmount, discountAmount, couponCode } = req.body;
     if (!items?.length) return res.status(400).json({ message: 'No order items' });
 
     const calculatedTotal = totalAmount || items.reduce(
@@ -20,9 +21,19 @@ router.post('/', protect, async (req: AuthRequest, res: Response) => {
       user: req.user!.id,
       items,
       totalAmount: calculatedTotal,
+      discountAmount: discountAmount || 0,
+      couponCode: couponCode || undefined,
       shippingAddress,
       paymentMethod: paymentMethod || 'card',
     });
+
+    // Increment coupon usedCount if a coupon was applied
+    if (couponCode) {
+      Coupon.findOneAndUpdate(
+        { code: (couponCode as string).toUpperCase() },
+        { $inc: { usedCount: 1 } }
+      ).catch(() => { /* non-blocking */ });
+    }
 
     // Send confirmation email async (don't block response)
     try {
