@@ -83,7 +83,7 @@ async function scrapeAlibabaPlaywright(query: string, count: number): Promise<Su
     ];
     const cards = $(cardSelectors.join(', '));
 
-    cards.each((_, el) => {
+    cards.each((_: number, el: any) => {
       if (suppliers.length >= count) return false;
 
       // Company name — try multiple selectors
@@ -169,7 +169,7 @@ async function scrapeAlibabaAxios(query: string, count: number): Promise<Supplie
   const category = guessCategory(query);
   const certs = CERTS[category] || CERTS['Accessories'];
 
-  $('[class*="company-name"], .company-name').each((_, el) => {
+  $('[class*="company-name"], .company-name').each((_: number, el: any) => {
     if (suppliers.length >= count) return false;
     const name = $(el).text().trim();
     if (!name || name.length < 3) return;

@@ -2,48 +2,27 @@ import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { Order } from '../models/Order';
 import { protect, AuthRequest } from '../middleware/auth';
+import { createStripeCheckoutSession, constructStripeWebhookEvent } from '../services/payment';
 
 const router = Router();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
 
 // POST /api/stripe/checkout-session
 // Creates a Stripe Checkout Session and returns the URL to redirect to
 router.post('/checkout-session', protect, async (req: AuthRequest, res: Response) => {
   try {
-    const { items, shippingAddress, orderId } = req.body;
+    const { items, orderId } = req.body;
     if (!items?.length) return res.status(400).json({ message: 'No items' });
-
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map((item: { name: string; price: number; quantity: number; image?: string }) => ({
-      price_data: {
-        currency: 'usd',
-        product_data: {
-          name: item.name,
-          ...(item.image?.startsWith('http') ? { images: [item.image] } : {}),
-        },
-        unit_amount: Math.round(item.price * 100), // cents
-      },
-      quantity: item.quantity,
-    }));
 
     const origin = req.headers.origin || process.env.CLIENT_URL || 'http://localhost:3000';
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      mode: 'payment',
-      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId || ''}`,
-      cancel_url: `${origin}/checkout?cancelled=1`,
-      customer_email: undefined, // set via session metadata
-      metadata: {
-        userId: req.user?.id || '',
-        orderId: orderId || '',
-      },
-      shipping_address_collection: {
-        allowed_countries: ['CL', 'AR', 'CO', 'MX', 'PE', 'ES', 'US'],
-      },
+    const result = await createStripeCheckoutSession({
+      items,
+      orderId: orderId || '',
+      userId: req.user?.id || '',
+      origin,
     });
 
-    res.json({ url: session.url, sessionId: session.id });
+    res.json({ url: result.url, sessionId: result.sessionId });
   } catch (err: unknown) {
     console.error('Stripe session error:', err);
     res.status(500).json({ message: 'Stripe error', error: String(err) });
@@ -58,9 +37,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
   let event: Stripe.Event;
   try {
-    event = secret
-      ? stripe.webhooks.constructEvent(req.body, sig, secret)
-      : JSON.parse(req.body.toString());
+    event = constructStripeWebhookEvent(req.body, sig, secret);
   } catch (err) {
     console.error('Webhook signature error:', err);
     return res.status(400).json({ message: 'Invalid webhook signature' });

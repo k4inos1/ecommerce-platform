@@ -104,12 +104,12 @@ async function scrapeMarketSnippets(query: string, category: string): Promise<{ 
   const snippets: string[] = [];
   const sources: string[] = [];
 
-  $('.result__snippet').each((_, el) => {
+  $('.result__snippet').each((_: number, el: any) => {
     const text = $(el).text().trim();
     if (text.length > 40) snippets.push(text);
   });
 
-  $('.result__url').each((_, el) => {
+  $('.result__url').each((_: number, el: any) => {
     const src = $(el).text().trim();
     if (src && !sources.includes(src)) sources.push(src);
   });
@@ -141,7 +141,7 @@ async function scrapeEbayPriceDistribution(query: string): Promise<PricePoint[]>
   const $ = cheerio.load(data);
   const prices: number[] = [];
 
-  $('.s-item__price').each((_, el) => {
+  $('.s-item__price').each((_: number, el: any) => {
     const text = $(el).text().trim();
     const num = parseFloat(text.replace(/[^0-9.]/g, ''));
     if (!isNaN(num) && num > 0 && num < 5000) prices.push(num);
