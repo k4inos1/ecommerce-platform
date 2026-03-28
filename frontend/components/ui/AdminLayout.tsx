@@ -35,8 +35,13 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map(item => (
             <Link key={item.href} href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
-              {item.icon} {item.label}
+              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+              <div className="flex items-center gap-3">
+                {item.icon} {item.label}
+              </div>
+              {item.label === 'Soporte' && (
+                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+              )}
             </Link>
           ))}
         </nav>

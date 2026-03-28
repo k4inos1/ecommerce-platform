@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ShoppingCart, Star, Shield, Truck, RotateCcw, Plus, Minus, Check } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Star, Shield, Truck, RotateCcw, Plus, Minus, Check, Zap } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { ReviewSection } from '@/components/ui/ReviewSection';
 
@@ -14,6 +14,16 @@ export function ProductClient({ product }: { product: Product }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [timeLeft, setTimeLeft] = useState('04:59:59');
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const h = 23 - now.getHours(), m = 59 - now.getMinutes(), s = 59 - now.getSeconds();
+      setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleAdd = () => {
     for (let i = 0; i < qty; i++) {
@@ -34,6 +44,20 @@ export function ProductClient({ product }: { product: Product }) {
       <div className="grid md:grid-cols-2 gap-12 lg:gap-20">
         {/* Left — Visuals */}
         <div className="space-y-6">
+          {/* Flash Offer Banner */}
+          <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-2xl p-4 flex items-center justify-between text-white shadow-lg shadow-red-900/20">
+            <div className="flex items-center gap-3">
+              <Zap className="w-5 h-5 fill-white animate-pulse" />
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-widest opacity-80">Oferta Relámpago</div>
+                <div className="text-sm font-bold">Ahorra hasta un 15% adicional</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] font-black uppercase tracking-widest opacity-80">Termina en</div>
+              <div className="text-lg font-mono font-black">{timeLeft}</div>
+            </div>
+          </div>
           <div className="card aspect-square flex items-center justify-center overflow-hidden bg-white/[0.02] border border-white/[0.05] shadow-2xl relative group">
             {isImg ? (
               <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
