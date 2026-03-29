@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, ShoppingCart, Star, Shield, Truck, RotateCcw, Plus, Minus, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import { getProduct, getRelatedProducts } from '@/lib/api';
 import { ReviewSection } from '@/components/ui/ReviewSection';
 
@@ -15,6 +16,7 @@ interface Product { _id: string; name: string; price: number; image: string; cat
 export default function ProductDetail({ params }: { params: { id: string } }) {
   const { addItem } = useCart();
   const { isInWishlist, toggle: toggleWishlist } = useWishlist();
+  const { format: formatPrice } = useCurrency();
   const [product, setProduct] = useState<Product | null>(null);
   const [related, setRelated] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +84,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
             <h1 className="text-3xl font-black text-white mt-3">{product.name}</h1>
           </div>
 
-          <div className="text-4xl font-black text-brand">${product.price.toLocaleString()}</div>
+          <div className="text-4xl font-black text-brand">{formatPrice(product.price)}</div>
           <p className="text-gray-400 leading-relaxed">{product.description}</p>
 
           {/* Stock */}
@@ -164,7 +166,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
                 </div>
                 <div className="text-[11px] text-gray-500 mb-1">{r.category}</div>
                 <div className="font-medium text-white text-sm leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">{r.name}</div>
-                <div className="mt-auto pt-2 text-indigo-400 font-bold">${r.price.toLocaleString()}</div>
+                <div className="mt-auto pt-2 text-indigo-400 font-bold">{formatPrice(r.price)}</div>
               </Link>
             ))}
           </div>

@@ -176,3 +176,28 @@ export async function updateOrderStatus(id: string, status: string) {
   if (!res.ok) throw new Error('Error al actualizar estado');
   return res.json();
 }
+
+// ─── Notifications ─────────────────────────────────────────
+export async function getNotifications() {
+  const res = await fetch(`${API_URL}/api/notifications`, { headers: userAuthHeaders() });
+  if (!res.ok) throw new Error('Error al cargar notificaciones');
+  return res.json();
+}
+
+export async function markNotificationRead(id: string) {
+  const res = await fetch(`${API_URL}/api/notifications/${id}/read`, {
+    method: 'PATCH',
+    headers: userAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Error al marcar notificación');
+  return res.json();
+}
+
+export async function markAllNotificationsRead() {
+  const res = await fetch(`${API_URL}/api/notifications/read-all`, {
+    method: 'PATCH',
+    headers: userAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Error al marcar notificaciones');
+  return res.json();
+}
