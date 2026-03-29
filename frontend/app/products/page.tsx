@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Search, SlidersHorizontal, ShoppingCart, Check, Star, X, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSearchParams, useRouter } from 'next/navigation';
 
@@ -22,6 +23,7 @@ interface Product { _id: string; name: string; price: number; image: string; cat
 function ProductsContent() {
   const { addItem } = useCart();
   const { isInWishlist, toggle: toggleWishlist } = useWishlist();
+  const { format: formatPrice } = useCurrency();
   const router = useRouter();
   const params = useSearchParams();
 
@@ -212,7 +214,7 @@ function ProductsContent() {
                 </div>
                 <div className="font-medium text-white text-sm leading-snug mb-2 line-clamp-2 group-hover:text-indigo-300 transition-colors">{p.name}</div>
                 <div className="mt-auto flex items-center justify-between">
-                  <span className="text-indigo-400 font-bold text-lg">${p.price.toLocaleString()}</span>
+                  <span className="text-indigo-400 font-bold text-lg">{formatPrice(p.price)}</span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.stock > 0 ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                     {p.stock > 0 ? `${p.stock} disp.` : 'Agotado'}
                   </span>
