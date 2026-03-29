@@ -57,7 +57,7 @@ async function scrapeAliExpressPlaywright(query: string, limit: number): Promise
     const content = await page.content();
     const $ = cheerio.load(content);
 
-    $('[class*="product-card"], [class*="search-item"], [data-spm*="item"]').each((_, el) => {
+    $('[class*="product-card"], [class*="search-item"], [data-spm*="item"]').each((_: number, el: any) => {
       if (products.length >= limit) return false;
       const name = $(el).find('[class*="title"], [class*="name"]').first().text().trim();
       const priceEl = $(el).find('[class*="price"]').first().text();
@@ -108,7 +108,7 @@ async function scrapeEbayPlaywright(query: string, limit: number): Promise<Scrap
     const content = await page.content();
     const $ = cheerio.load(content);
 
-    $('.s-item').each((_, el) => {
+    $('.s-item').each((_: number, el: any) => {
       if (products.length >= limit) return false;
       const name = $(el).find('.s-item__title').text().trim().replace('Shop on eBay', '').trim();
       const priceText = $(el).find('.s-item__price').first().text().trim();
@@ -160,7 +160,7 @@ async function scrapeEbayCheerio(query: string, limit: number): Promise<ScrapedP
   const $ = cheerio.load(data);
   const products: ScrapedProduct[] = [];
 
-  $('.s-item').each((_, el) => {
+  $('.s-item').each((_: number, el: any) => {
     if (products.length >= limit) return false;
     const name = $(el).find('.s-item__title').text().trim().replace('Shop on eBay', '').trim();
     const priceText = $(el).find('.s-item__price').first().text().trim();
