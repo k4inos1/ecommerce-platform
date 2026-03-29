@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft, ShoppingCart, Star, Shield, Truck, RotateCcw, Plus, Minus, Check, Zap, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import { ReviewSection } from '@/components/ui/ReviewSection';
 import { ProductCard } from '@/components/ui/ProductCard';
 import { getRelatedProducts } from '@/lib/api';
@@ -16,6 +17,7 @@ interface Product { _id: string; name: string; price: number; image: string; cat
 export function ProductClient({ product }: { product: Product }) {
   const { addItem } = useCart();
   const { toggle, isInWishlist } = useWishlist();
+  const { format: formatPrice } = useCurrency();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [timeLeft, setTimeLeft] = useState('04:59:59');
@@ -101,7 +103,7 @@ export function ProductClient({ product }: { product: Product }) {
             </div>
             <h1 className="text-4xl lg:text-5xl font-display font-black text-white leading-[1.1] mb-6">{product.name}</h1>
             <div className="text-5xl font-display font-black text-white mb-6">
-              ${product.price.toLocaleString()}
+              {formatPrice(product.price)}
               <span className="text-sm text-gray-500 font-medium ml-3 font-sans">IVA Incluido</span>
             </div>
             <p className="text-gray-400 text-lg leading-relaxed">{product.description}</p>

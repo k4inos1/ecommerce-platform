@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/ui/AdminLayout';
-import { getCoupons, createCoupon, deleteCoupon } from '@/lib/api';
-import { Plus, Trash2, Ticket, Check, Calendar, Settings2, Loader2 } from 'lucide-react';
+import { getCoupons, createCoupon, deleteCoupon, updateCoupon } from '@/lib/api';
+import { Plus, Trash2, Ticket, Calendar, Settings2, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
 
 interface Coupon {
   _id: string;
@@ -64,6 +64,15 @@ export default function AdminCoupons() {
       setCoupons(prev => prev.filter(c => c._id !== id));
     } catch (err) {
       alert('Error al eliminar cupón');
+    }
+  };
+
+  const handleToggleActive = async (coupon: Coupon) => {
+    try {
+      await updateCoupon(coupon._id, { active: !coupon.active });
+      setCoupons(prev => prev.map(c => c._id === coupon._id ? { ...c, active: !c.active } : c));
+    } catch (err) {
+      alert('Error al actualizar cupón');
     }
   };
 
@@ -207,6 +216,12 @@ export default function AdminCoupons() {
                     {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString() : 'Nunca'}
                   </div>
                 </div>
+                <button 
+                  onClick={() => handleToggleActive(c)}
+                  title={c.active ? 'Desactivar cupón' : 'Activar cupón'}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${c.active ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-gray-600 hover:text-emerald-400 hover:bg-emerald-500/10'}`}>
+                  {c.active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                </button>
                 <button 
                   onClick={() => handleDelete(c._id)}
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-colors">

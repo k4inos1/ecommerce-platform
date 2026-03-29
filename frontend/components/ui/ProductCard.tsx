@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Heart, ShoppingCart, Zap, Star } from 'lucide-react';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useState } from 'react';
 
 interface Product {
@@ -20,6 +21,7 @@ const EMOJI: Record<string, string> = { Laptops: '💻', Phones: '📱', Audio: 
 export function ProductCard({ p }: { p: Product }) {
   const { toggle, isInWishlist } = useWishlist();
   const { addItem } = useCart();
+  const { format: formatPrice } = useCurrency();
   const [adding, setAdding] = useState(false);
   
   const inWishlist = isInWishlist(p._id);
@@ -81,7 +83,7 @@ export function ProductCard({ p }: { p: Product }) {
 
       <div className="flex items-center justify-between mt-auto">
         <div className="flex flex-col">
-          <span className="text-indigo-400 font-bold text-lg leading-none">${p.price.toLocaleString()}</span>
+          <span className="text-indigo-400 font-bold text-lg leading-none">{formatPrice(p.price)}</span>
           <span className="text-[9px] text-gray-600 font-medium">IVA incluido</span>
         </div>
         
