@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { v2 as cloudinary } from 'cloudinary';
-import { scrapeProducts } from '../services/scraper';
+import { scrapeByEngines, compareEngines, ScraperEngine } from '../services/scraper';
+import { uploadImageUrl, isAllowedImageUrl } from '../services/cloudinary';
 import { calculateProfit } from '../utils/profitCalculator';
 import { analyzeMarket } from '../services/marketAnalysis';
 import { findSuppliers } from '../services/supplierFinder';
@@ -9,12 +9,6 @@ import { optimizeListing } from '../services/listingOptimizer';
 import { protect, adminOnly, AuthRequest } from '../middleware/auth';
 import { Product } from '../models/Product';
 import { ScrapedResult } from '../models/ScrapedResult';
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 const router = Router();
 
@@ -28,13 +22,31 @@ const scraperLimiter = rateLimit({
   message: { message: 'Demasiadas solicitudes de scraping. Espera un momento e intenta de nuevo.' },
 });
 
-/** GET /api/scraper/search?q=laptops&limit=12 */
+/**
+ * Parse the `engines` query param into a validated ScraperEngine array.
+ * Accepts comma-separated values, e.g. "aliexpress,ebay".
+ * Falls back to both engines when the param is absent or invalid.
+ */
+const VALID_ENGINES: ScraperEngine[] = ['aliexpress', 'ebay'];
+const DEFAULT_ENGINES: ScraperEngine[] = [...VALID_ENGINES];
+
+function parseEngines(raw: string | undefined): ScraperEngine[] {
+  if (!raw) return DEFAULT_ENGINES;
+  const requested = raw
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter((e): e is ScraperEngine => VALID_ENGINES.includes(e as ScraperEngine));
+  return requested.length > 0 ? requested : DEFAULT_ENGINES;
+}
+
+/** GET /api/scraper/search?q=laptops&limit=12&engines=aliexpress,ebay */
 router.get('/search', scraperLimiter, protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
     const query = (req.query.q as string) || '';
     const limit = Math.min(Number(req.query.limit) || 12, 24);
+    const engines = parseEngines(req.query.engines as string | undefined);
     if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
-    const products = await scrapeProducts(query, limit);
+    const products = await scrapeByEngines(query, limit, engines);
 
     // Persist scraping results to MongoDB only when we have data (non-blocking)
     if (products.length > 0) {
@@ -42,9 +54,26 @@ router.get('/search', scraperLimiter, protect, adminOnly, async (req: AuthReques
         .catch((e: Error) => console.warn('ScrapedResult save failed:', e.message));
     }
 
-    res.json({ products, count: products.length });
+    res.json({ products, count: products.length, engines });
   } catch (err) {
     res.status(500).json({ message: 'Scraping failed', error: String(err) });
+  }
+});
+
+/**
+ * GET /api/scraper/compare?q=wireless headphones&limit=8
+ * Scrapes all available engines concurrently and returns results grouped by
+ * engine so the frontend can render a side-by-side price comparison.
+ */
+router.get('/compare', scraperLimiter, protect, adminOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const query = (req.query.q as string) || '';
+    const limit = Math.min(Number(req.query.limit) || 8, 16);
+    if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
+    const results = await compareEngines(query, limit);
+    res.json({ results, query });
+  } catch (err) {
+    res.status(500).json({ message: 'Comparison scraping failed', error: String(err) });
   }
 });
 
@@ -90,26 +119,6 @@ router.post('/calculate', protect, adminOnly, (req: AuthRequest, res: Response) 
   res.json(calculateProfit({ sellingPrice: Number(sellingPrice), supplierCost: Number(supplierCost), shippingCost: Number(shippingCost) || undefined, otherCosts: Number(otherCosts) || undefined }));
 });
 
-// Allowed image host patterns for Cloudinary uploads (prevents SSRF / quota abuse)
-const ALLOWED_IMAGE_HOSTS = [
-  'ae01.alicdn.com', 'ae02.alicdn.com', 'ae03.alicdn.com', 'ae04.alicdn.com',
-  'i.ebayimg.com',
-  'images-na.ssl-images-amazon.com', 'm.media-amazon.com',
-  'images.unsplash.com',
-];
-
-function isAllowedImageUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
-      ALLOWED_IMAGE_HOSTS.some((host) => parsed.hostname.endsWith(host))
-    );
-  } catch {
-    return false;
-  }
-}
-
 /** POST /api/scraper/import — saves product as draft, uploading image to Cloudinary if needed */
 router.post('/import', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
@@ -119,14 +128,12 @@ router.post('/import', protect, adminOnly, async (req: AuthRequest, res: Respons
     // Upload external image URL to Cloudinary so we own the asset.
     // Only upload from known, trusted hosts to prevent SSRF and quota abuse.
     let finalImage = image || '';
+    let cloudinaryPublicId: string | undefined;
     if (image && isAllowedImageUrl(image)) {
       try {
-        const result = await cloudinary.uploader.upload(image, {
-          folder: 'techstore/products',
-          resource_type: 'image',
-          transformation: [{ width: 800, crop: 'limit', quality: 'auto' }],
-        });
-        finalImage = result.secure_url;
+        const uploaded = await uploadImageUrl(image, 'techstore/products');
+        finalImage = uploaded.url;
+        cloudinaryPublicId = uploaded.public_id;
         console.log(`☁️  Image uploaded to Cloudinary: ${finalImage}`);
       } catch (e) {
         console.warn('Cloudinary upload failed, using original URL:', (e as Error).message);
@@ -138,6 +145,7 @@ router.post('/import', protect, adminOnly, async (req: AuthRequest, res: Respons
       name,
       price: Number(price),
       image: finalImage,
+      ...(cloudinaryPublicId ? { cloudinaryPublicId } : {}),
       description: description || '',
       category: category || 'Accessories',
       stock: Number(stock) || 10,
