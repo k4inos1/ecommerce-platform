@@ -213,7 +213,7 @@ export async function scrapeEngine(
     case 'aliexpress': {
       const results = await scrapeAliExpressPlaywright(query, limit);
       if (results.length > 0) return results;
-      throw new Error(`AliExpress scraping returned no results for query "${query}"`);
+      throw new Error(`AliExpress scraping returned zero results for query "${query}"`);
     }
     case 'ebay': {
       // Try fast cheerio first, fall back to Playwright

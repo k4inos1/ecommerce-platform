@@ -39,7 +39,7 @@ export const uploadImage = (
           if (result) {
             resolve({ url: result.secure_url, public_id: result.public_id });
           } else {
-            reject(new Error('Cloudinary upload returned no result'));
+            reject(new Error('Cloudinary upload returned no results'));
           }
         },
       )
@@ -105,9 +105,7 @@ export function isAllowedImageUrl(url: string): boolean {
     const parsed = new URL(url);
     return (
       (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
-      ALLOWED_IMAGE_HOSTS.some(
-        (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`),
-      )
+      ALLOWED_IMAGE_HOSTS.some((host) => parsed.hostname === host)
     );
   } catch {
     return false;

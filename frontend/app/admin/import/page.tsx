@@ -26,10 +26,15 @@ const ENGINE_META: Record<string, { label: string; color: string; dot: string }>
   ebay:       { label: 'eBay',       color: 'text-blue-400 bg-blue-400/10 border-blue-500/20',     dot: 'bg-blue-400' },
 };
 
-// Pre-computed reverse lookup: engine label → ENGINE_META key
-const ENGINE_BY_LABEL: Record<string, typeof ENGINE_META[string]> = Object.fromEntries(
-  Object.values(ENGINE_META).map((m) => [m.label, m]),
+// Pre-computed reverse lookup: source (label or key) → ENGINE_META
+const ENGINE_BY_SOURCE: Record<string, typeof ENGINE_META[string]> = Object.fromEntries(
+  Object.entries(ENGINE_META).flatMap(([key, meta]) => [
+    [key, meta],
+    [meta.label.toLowerCase(), meta],
+  ]),
 );
+
+export default function AdminImport() {
   const router = useRouter();
   const token = getToken();
   const [tab, setTab] = useState('search');
@@ -79,11 +84,12 @@ const ENGINE_BY_LABEL: Record<string, typeof ENGINE_META[string]> = Object.fromE
   }, [token]);
 
   const toggleEngine = (engine: string) => {
-    setSelectedEngines(prev =>
-      prev.includes(engine)
-        ? prev.length > 1 ? prev.filter(e => e !== engine) : prev   // keep at least one
-        : [...prev, engine],
-    );
+    setSelectedEngines(prev => {
+      if (prev.includes(engine)) {
+        return prev.length > 1 ? prev.filter(e => e !== engine) : prev; // keep at least one
+      }
+      return [...prev, engine];
+    });
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -178,7 +184,8 @@ const ENGINE_BY_LABEL: Record<string, typeof ENGINE_META[string]> = Object.fromE
         {p.margin >= 30 ? <CheckCircle className="w-4 h-4 text-green-400 shrink-0" /> : <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
       </div>
       {showSource && p.source && (() => {
-        const meta = ENGINE_BY_LABEL[p.source] ?? null;
+        const sourceKey = String(p.source).toLowerCase();
+        const meta = ENGINE_BY_SOURCE[sourceKey] ?? null;
         return (
           <span className={`text-[10px] self-start px-2 py-0.5 rounded-full border ${meta ? meta.color : 'text-gray-400 bg-gray-400/10 border-gray-500/20'}`}>
             {p.source}
