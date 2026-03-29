@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Trash2, Plus, Minus, ShoppingBag, Heart, ArrowRight, Package, CheckCircle, Tag, Ticket, XCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import { validateCoupon } from '@/lib/api';
 
 // Group cart items by category emoji prefix or first word
@@ -20,6 +21,7 @@ function getGroup(name: string): string {
 
 export default function CartPage() {
   const { items, removeItem, updateQty, total, clearCart, appliedCoupon, applyCoupon, discountAmount, finalTotal } = useCart();
+  const { format: formatPrice } = useCurrency();
   const [checkedOff, setCheckedOff] = useState<Set<string>>(new Set());
   const [couponCode, setCouponCode] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
@@ -118,7 +120,7 @@ export default function CartPage() {
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className={`font-medium text-sm leading-snug ${isChecked ? 'line-through text-gray-500' : 'text-white'}`}>{item.name}</div>
-                        <div className="text-indigo-400 text-sm font-bold mt-0.5">${item.price.toLocaleString()}</div>
+                        <div className="text-indigo-400 text-sm font-bold mt-0.5">{formatPrice(item.price)}</div>
                       </div>
 
                       {/* Qty controls (inline edit — skill pattern) */}
@@ -136,7 +138,7 @@ export default function CartPage() {
 
                       {/* Subtotal */}
                       <div className="text-white font-semibold text-sm w-16 text-right shrink-0">
-                        ${(item.price * item.quantity).toLocaleString()}
+                        {formatPrice(item.price * item.quantity)}
                       </div>
 
                       {/* Delete */}
@@ -167,7 +169,7 @@ export default function CartPage() {
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between text-gray-400">
                 <span>Subtotal ({itemCount} items)</span>
-                <span>${total.toLocaleString()}</span>
+                <span>{formatPrice(total)}</span>
               </div>
               
               {appliedCoupon && (
@@ -178,19 +180,19 @@ export default function CartPage() {
                       <XCircle className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <span>-${discountAmount.toLocaleString()}</span>
+                  <span>-{formatPrice(discountAmount)}</span>
                 </div>
               )}
 
               <div className="flex justify-between text-gray-400">
                 <span>Envío</span>
                 <span className={shipping === 0 ? 'text-green-400' : 'text-white'}>
-                  {shipping === 0 ? '✓ Gratis' : `$${shipping}`}
+                  {shipping === 0 ? '✓ Gratis' : formatPrice(shipping)}
                 </span>
               </div>
               {shipping > 0 && total > 0 && (
                 <p className="text-[11px] text-gray-600">
-                  Agrega ${(99 - total).toFixed(0)} más para envío gratis
+                  Agrega {formatPrice(Math.max(0, 99 - total))} más para envío gratis
                 </p>
               )}
             </div>
@@ -199,7 +201,7 @@ export default function CartPage() {
 
             <div className="flex justify-between font-bold text-white">
               <span>Total</span>
-              <span className="text-xl text-indigo-400">${grandTotal.toLocaleString()}</span>
+              <span className="text-xl text-indigo-400">{formatPrice(grandTotal)}</span>
             </div>
 
             {/* Coupon input */}
