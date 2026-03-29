@@ -2,7 +2,7 @@
 
 import { useWishlist } from '@/context/WishlistContext';
 import { ProductCard } from '@/components/ui/ProductCard';
-import { Heart, shopping_cart as ShoppingCartIcon, ArrowRight, PackageOpen } from 'lucide-react';
+import { Heart, ShoppingCart, ArrowRight, PackageOpen } from 'lucide-react';
 import Link from 'next/link';
 
 export default function WishlistPage() {
