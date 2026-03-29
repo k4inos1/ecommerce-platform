@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 
-// Lazy-initialise: configure only on the first actual usage so the server
+// Lazy-initialize: configure only on the first actual usage so the server
 // can start (and pass health-checks) even when Cloudinary env vars are absent.
 let _configured = false;
 
@@ -39,7 +39,7 @@ export const uploadImage = (
           if (result) {
             resolve({ url: result.secure_url, public_id: result.public_id });
           } else {
-            reject(new Error('Cloudinary upload returned no results'));
+            reject(new Error('Cloudinary upload completed but did not return the expected result object. Verify Cloudinary configuration and network connectivity.'));
           }
         },
       )
@@ -98,13 +98,13 @@ const ALLOWED_IMAGE_HOSTS = [
  * Use this guard before calling uploadImageUrl() with an external URL.
  *
  * Exact hostname matching is used: the URL hostname must equal one of the
- * allowed hosts exactly (prevents "evil.ae01.alicdn.com.attacker.com" bypass).
+ * allowed hosts exactly (prevents untrusted subdomains from bypassing checks).
  */
 export function isAllowedImageUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return (
-      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      parsed.protocol === 'https:' &&
       ALLOWED_IMAGE_HOSTS.some((host) => parsed.hostname === host)
     );
   } catch {

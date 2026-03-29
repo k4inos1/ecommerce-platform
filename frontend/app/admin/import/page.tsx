@@ -21,14 +21,18 @@ const TABS = [
   { id: 'optimize', label: 'Optimizar', icon: FileText },
 ];
 
-const ENGINE_META: Record<string, { label: string; color: string; dot: string }> = {
+type ScraperEngine = 'aliexpress' | 'ebay';
+type EngineMeta = { label: string; color: string; dot: string };
+
+const ENGINE_META: Record<ScraperEngine, EngineMeta> = {
   aliexpress: { label: 'AliExpress', color: 'text-orange-400 bg-orange-400/10 border-orange-500/20', dot: 'bg-orange-400' },
   ebay:       { label: 'eBay',       color: 'text-blue-400 bg-blue-400/10 border-blue-500/20',     dot: 'bg-blue-400' },
 };
+const ENGINE_ENTRIES = Object.entries(ENGINE_META) as Array<[ScraperEngine, EngineMeta]>;
 
 // Pre-computed reverse lookup: source (label or key) → ENGINE_META
-const ENGINE_BY_SOURCE: Record<string, typeof ENGINE_META[string]> = Object.fromEntries(
-  Object.entries(ENGINE_META).flatMap(([key, meta]) => [
+const ENGINE_BY_SOURCE: Record<string, EngineMeta> = Object.fromEntries(
+  ENGINE_ENTRIES.flatMap(([key, meta]) => [
     [key, meta],
     [meta.label.toLowerCase(), meta],
   ]),
@@ -44,7 +48,7 @@ export default function AdminImport() {
   const [error, setError] = useState('');
 
   // Engine selection (for "Buscar" tab)
-  const [selectedEngines, setSelectedEngines] = useState<string[]>(['aliexpress', 'ebay']);
+  const [selectedEngines, setSelectedEngines] = useState<ScraperEngine[]>(['aliexpress', 'ebay']);
 
   // Search state
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -83,12 +87,11 @@ export default function AdminImport() {
     finally { setLoading(false); }
   }, [token]);
 
-  const toggleEngine = (engine: string) => {
+  const toggleEngine = (engine: ScraperEngine) => {
     setSelectedEngines(prev => {
-      if (prev.includes(engine)) {
-        return prev.length > 1 ? prev.filter(e => e !== engine) : prev; // keep at least one
-      }
-      return [...prev, engine];
+      if (!prev.includes(engine)) return [...prev, engine];
+      if (prev.length > 1) return prev.filter(e => e !== engine); // keep at least one
+      return prev;
     });
   };
 
@@ -164,7 +167,7 @@ export default function AdminImport() {
       {showEngines && (
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500">Motores:</span>
-          {Object.entries(ENGINE_META).map(([key, meta]) => (
+          {ENGINE_ENTRIES.map(([key, meta]) => (
             <button key={key} type="button" onClick={() => toggleEngine(key)}
               className={`flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-all ${selectedEngines.includes(key) ? meta.color : 'text-gray-600 bg-transparent border-white/10'}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${selectedEngines.includes(key) ? meta.dot : 'bg-gray-600'}`} />
@@ -280,7 +283,7 @@ export default function AdminImport() {
           <div className="space-y-6">
             <div className="card p-4 flex items-start gap-3">
               <TrendingUp className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
-              <div className="text-xs text-gray-400">Busca productos en los motores seleccionados. Solo puedes importar los que tengan <span className="text-green-400 font-medium">margen ≥ 30%</span> según el skill.</div>
+              <div className="text-xs text-gray-400">Busca productos en los motores seleccionados. Solo puedes importar los que tengan <span className="text-green-400 font-medium">margen ≥ 30%</span> según el análisis.</div>
             </div>
             <SearchBar onSubmit={handleSearch} showEngines placeholder="Ej: wireless headphones, gaming chair..." />
             {searchResults.length > 0 && (
@@ -307,7 +310,8 @@ export default function AdminImport() {
             {compareResults.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {compareResults.map((engineResult: any) => {
-                  const meta = ENGINE_META[engineResult.engine] || { label: engineResult.label, color: 'text-gray-400 bg-gray-400/10 border-gray-500/20', dot: 'bg-gray-400' };
+                  const engineKey = engineResult.engine as ScraperEngine;
+                  const meta = ENGINE_META[engineKey] || { label: engineResult.label, color: 'text-gray-400 bg-gray-400/10 border-gray-500/20', dot: 'bg-gray-400' };
                   return (
                     <div key={engineResult.engine} className="space-y-3">
                       {/* Engine header */}

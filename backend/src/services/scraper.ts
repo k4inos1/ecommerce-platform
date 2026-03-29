@@ -213,7 +213,7 @@ export async function scrapeEngine(
     case 'aliexpress': {
       const results = await scrapeAliExpressPlaywright(query, limit);
       if (results.length > 0) return results;
-      throw new Error(`AliExpress scraping returned zero results for query "${query}"`);
+      throw new Error(`AliExpress returned no results for query "${query}".`);
     }
     case 'ebay': {
       // Try fast cheerio first, fall back to Playwright
@@ -251,7 +251,7 @@ export async function scrapeByEngines(
   }
 
   if (combined.length === 0) {
-    throw new Error('All selected scraping engines failed. Try a different query.');
+    throw new Error(`All selected scraping engines (${engines.join(', ')}) failed to return results.`);
   }
   return combined.slice(0, limit);
 }
