@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { Search, SlidersHorizontal, Star, X } from 'lucide-react';
+import { Search, SlidersHorizontal, Star, X, Check, ShoppingCart, Heart } from 'lucide-react';
+import Link from 'next/link';
+import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSearchParams } from 'next/navigation';
-import { ProductCard } from '@/components/ui/ProductCard';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 const CATEGORIES = ['All', 'Laptops', 'Phones', 'Audio', 'Tablets', 'Wearables', 'Monitors', 'Accessories'];
+const EMOJI: Record<string, string> = { Laptops: '💻', Phones: '📱', Audio: '🎧', Tablets: '🖥️', Wearables: '⌚', Monitors: '🖵', Accessories: '🔧' };
 const PRICE_PRESETS = [
   { label: '< $100', min: '', max: '100' },
   { label: '$100–500', min: '100', max: '500' },
@@ -22,7 +24,6 @@ function ProductsContent() {
   const { addItem } = useCart();
   const { isInWishlist, toggle: toggleWishlist } = useWishlist();
   const { format: formatPrice } = useCurrency();
-  const router = useRouter();
   const params = useSearchParams();
 
   const [search, setSearch] = useState(params.get('q') || '');
@@ -35,6 +36,7 @@ function ProductsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [added, setAdded] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 400);
   const debouncedMin = useDebounce(minPrice, 500);
@@ -69,6 +71,12 @@ function ProductsContent() {
     if (sort === 'price-desc') return b.price - a.price;
     return 0;
   });
+
+  const handleAdd = (p: Product) => {
+    addItem({ id: p._id, name: p.name, price: p.price, image: p.image || EMOJI[p.category] || '📦' });
+    setAdded(p._id);
+    setTimeout(() => setAdded(null), 2000);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 lg:py-16">
