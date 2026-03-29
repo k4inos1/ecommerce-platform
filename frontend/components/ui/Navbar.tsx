@@ -1,20 +1,26 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingCart, Menu, X, Zap, User, Package, LogOut, Heart } from 'lucide-react';
+import { ShoppingCart, Menu, X, Zap, User, Package, LogOut, Heart, Bell, DollarSign } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { useNotifications } from '@/context/NotificationsContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useState, useEffect, useRef } from 'react';
 
 export function Navbar() {
   const { items } = useCart();
   const { wishlistIds } = useWishlist();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { currency, setCurrency } = useCurrency();
   const count = items.reduce((s, i) => s + i.quantity, 0);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -37,9 +43,12 @@ export function Navbar() {
     return () => { window.removeEventListener('storage', handler); window.removeEventListener('authchange', handler); };
   }, []);
 
-  // Close user menu on outside click
+  // Close menus on outside click
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false); };
+    const h = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
@@ -51,6 +60,11 @@ export function Navbar() {
     setUserName(null);
     setUserMenuOpen(false);
     window.dispatchEvent(new Event('authchange'));
+  };
+
+  const handleNotifOpen = () => {
+    setNotifOpen(p => !p);
+    setUserMenuOpen(false);
   };
 
   const navLinks = [
@@ -81,6 +95,16 @@ export function Navbar() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* Currency switcher */}
+          <button
+            onClick={() => setCurrency(currency === 'USD' ? 'CLP' : 'USD')}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+            title="Cambiar moneda"
+          >
+            <DollarSign className="w-3.5 h-3.5" />
+            {currency}
+          </button>
+
           {/* Cart */}
           <Link href="/cart" className="relative flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-all">
             <ShoppingCart className="w-4 h-4" />
@@ -92,10 +116,66 @@ export function Navbar() {
             )}
           </Link>
 
+          {/* Notification bell (only when logged in) */}
+          {userName && (
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={handleNotifOpen}
+                className="relative p-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all"
+                title="Notificaciones"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-[#0f0f1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+                    <span className="text-sm font-semibold text-white">Notificaciones</span>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+                        Marcar todas
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center">
+                        <Bell className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">Sin notificaciones</p>
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <button
+                          key={n._id}
+                          onClick={() => { markRead(n._id); if (n.orderId) { setNotifOpen(false); window.location.href = '/mis-ordenes'; } }}
+                          className={`w-full text-left px-4 py-3 border-b border-white/[0.04] hover:bg-white/5 transition-colors ${!n.read ? 'bg-indigo-500/5' : ''}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {!n.read && <span className="mt-1.5 w-2 h-2 bg-indigo-500 rounded-full shrink-0" />}
+                            <div className={!n.read ? '' : 'ml-4'}>
+                              <p className={`text-xs font-semibold ${!n.read ? 'text-white' : 'text-gray-400'}`}>{n.title}</p>
+                              <p className="text-xs text-gray-500 mt-0.5 leading-snug">{n.message}</p>
+                              <p className="text-[10px] text-gray-600 mt-1">{new Date(n.createdAt).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* User menu */}
           {userName ? (
             <div className="relative" ref={userMenuRef}>
-              <button onClick={() => setUserMenuOpen(!userMenuOpen)}
+              <button onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-all">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline max-w-[100px] truncate">{userName.split(' ')[0]}</span>
@@ -152,6 +232,13 @@ export function Navbar() {
               {l.label}
             </Link>
           ))}
+          {/* Currency toggle in mobile */}
+          <button
+            onClick={() => setCurrency(currency === 'USD' ? 'CLP' : 'USD')}
+            className="block w-full text-left py-3 text-sm text-gray-400 hover:text-white border-b border-white/5 transition-colors"
+          >
+            💱 Moneda: {currency}
+          </button>
           {userName && (
             <button onClick={() => { handleLogout(); setMenuOpen(false); }}
               className="block w-full text-left py-3 text-sm text-red-400 transition-colors">

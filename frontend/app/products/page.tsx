@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { useWishlist } from '@/context/WishlistContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSearchParams } from 'next/navigation';
 import { ProductCard } from '@/components/ui/ProductCard';
@@ -18,7 +19,10 @@ const PRICE_PRESETS = [
 interface Product { _id: string; name: string; price: number; image: string; category: string; description: string; stock: number }
 
 function ProductsContent() {
-  const { isInWishlist } = useWishlist();
+  const { addItem } = useCart();
+  const { isInWishlist, toggle: toggleWishlist } = useWishlist();
+  const { format: formatPrice } = useCurrency();
+  const router = useRouter();
   const params = useSearchParams();
 
   const [search, setSearch] = useState(params.get('q') || '');
@@ -220,7 +224,44 @@ function ProductsContent() {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           {sorted.map(p => (
-            <ProductCard key={p._id} p={p} />
+            <div key={p._id} className="card group hover:border-indigo-500/30 hover:-translate-y-1 transition-all duration-200 flex flex-col">
+              <Link href={`/products/${p._id}`} className="flex flex-col flex-1 p-4">
+                {/* Image */}
+                <div className="aspect-square rounded-xl bg-white/[0.03] overflow-hidden flex items-center justify-center mb-4">
+                  {p.image?.startsWith('http') ? (
+                    <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  ) : (
+                    <span className="text-4xl">{EMOJI[p.category] || '📦'}</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-gray-500 mb-1 flex items-center justify-between">
+                  <span>{p.category}</span>
+                  <div className="flex">
+                    {[...Array(5)].map((_, i) => <Star key={i} className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />)}
+                  </div>
+                </div>
+                <div className="font-medium text-white text-sm leading-snug mb-2 line-clamp-2 group-hover:text-indigo-300 transition-colors">{p.name}</div>
+                <div className="mt-auto flex items-center justify-between">
+                  <span className="text-indigo-400 font-bold text-lg">{formatPrice(p.price)}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.stock > 0 ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                    {p.stock > 0 ? `${p.stock} disp.` : 'Agotado'}
+                  </span>
+                </div>
+              </Link>
+              <div className="p-3 pt-0 flex gap-2">
+                <button onClick={() => handleAdd(p)} disabled={p.stock === 0}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${added === p._id ? 'bg-green-600 text-white' : p.stock === 0 ? 'bg-white/5 text-gray-600 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/30'}`}>
+                  {added === p._id ? <><Check className="w-4 h-4" /> Agregado</> : <><ShoppingCart className="w-4 h-4" /> Agregar</>}
+                </button>
+                <button
+                  onClick={(e) => { e.preventDefault(); toggleWishlist(p._id); }}
+                  className={`p-2.5 rounded-xl border transition-all ${isInWishlist(p._id) ? 'bg-pink-500/20 border-pink-500/40 text-pink-400' : 'border-white/10 text-gray-500 hover:text-pink-400 hover:border-pink-500/30'}`}
+                  title={isInWishlist(p._id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                >
+                  <Heart className={`w-4 h-4 ${isInWishlist(p._id) ? 'fill-pink-400' : ''}`} />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}

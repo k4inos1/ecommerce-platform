@@ -4,6 +4,7 @@ import { protect, adminOnly, AuthRequest } from '../middleware/auth';
 import { sendOrderConfirmation } from '../services/email';
 import { User } from '../models/User';
 import { Coupon } from '../models/Coupon';
+import { Notification } from '../models/Notification';
 
 const router = Router();
 
@@ -50,6 +51,15 @@ router.post('/', protect, async (req: AuthRequest, res: Response) => {
       }
     } catch { /* silent */ }
 
+    // Create in-app notification for new order
+    Notification.create({
+      user: req.user!.id,
+      type: 'order_placed',
+      title: '🎉 Pedido recibido',
+      message: `Tu pedido #${String(order._id).slice(-6).toUpperCase()} ha sido recibido y está pendiente de confirmación.`,
+      orderId: order._id,
+    }).catch(() => { /* non-blocking */ });
+
     res.status(201).json(order);
   } catch (err) {
     res.status(400).json({ message: 'Invalid data', error: err });
@@ -83,6 +93,13 @@ router.get('/:id', protect, async (req: AuthRequest, res: Response) => {
   }
 });
 
+const STATUS_LABELS: Record<string, { title: string; message: string }> = {
+  processing: { title: '📦 Pedido en proceso', message: 'Tu pedido está siendo preparado.' },
+  shipped: { title: '🚚 Pedido enviado', message: 'Tu pedido está en camino.' },
+  delivered: { title: '✅ Pedido entregado', message: '¡Tu pedido ha sido entregado!' },
+  cancelled: { title: '❌ Pedido cancelado', message: 'Tu pedido ha sido cancelado.' },
+};
+
 // PATCH /api/orders/:id/status - Admin: update order status
 router.patch('/:id/status', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
@@ -90,13 +107,16 @@ router.patch('/:id/status', protect, adminOnly, async (req: AuthRequest, res: Re
     const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true }).populate('user', 'name email');
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
-    // Trigger email if status is "shipped"
-    if (status === 'shipped' && order.user && (order.user as any).email) {
-      const u = order.user as any;
-      import('../services/email').then(m => {
-        m.sendOrderShippedEmail(u.email, u.name || 'Cliente', String(order._id))
-          .catch(e => console.warn('Shipping email failed:', e.message));
-      });
+    // Create in-app notification for the order owner
+    const label = STATUS_LABELS[status];
+    if (label && order.user) {
+      Notification.create({
+        user: order.user,
+        type: 'order_status',
+        title: label.title,
+        message: `${label.message} Orden #${String(order._id).slice(-6).toUpperCase()}`,
+        orderId: order._id,
+      }).catch(() => { /* non-blocking */ });
     }
 
     res.json(order);
