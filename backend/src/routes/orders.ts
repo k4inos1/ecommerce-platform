@@ -95,16 +95,16 @@ router.get('/:id', protect, async (req: AuthRequest, res: Response) => {
 
 const STATUS_LABELS: Record<string, { title: string; message: string }> = {
   processing: { title: '📦 Pedido en proceso', message: 'Tu pedido está siendo preparado.' },
-  shipped:    { title: '🚚 Pedido enviado',    message: 'Tu pedido está en camino.' },
-  delivered:  { title: '✅ Pedido entregado',  message: '¡Tu pedido ha sido entregado!' },
-  cancelled:  { title: '❌ Pedido cancelado',  message: 'Tu pedido ha sido cancelado.' },
+  shipped: { title: '🚚 Pedido enviado', message: 'Tu pedido está en camino.' },
+  delivered: { title: '✅ Pedido entregado', message: '¡Tu pedido ha sido entregado!' },
+  cancelled: { title: '❌ Pedido cancelado', message: 'Tu pedido ha sido cancelado.' },
 };
 
 // PATCH /api/orders/:id/status - Admin: update order status
 router.patch('/:id/status', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
     const { status } = req.body;
-    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true }).populate('user', 'name email');
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     // Create in-app notification for the order owner

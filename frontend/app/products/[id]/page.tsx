@@ -8,61 +8,47 @@ import { useWishlist } from '@/context/WishlistContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import { getProduct, getRelatedProducts } from '@/lib/api';
 import { ReviewSection } from '@/components/ui/ReviewSection';
+import { ProductClient } from './ProductClient';
 
-const EMOJI: Record<string, string> = { Laptops: '💻', Phones: '📱', Audio: '🎧', Tablets: '🖥️', Wearables: '⌚', Monitors: '🖵', Accessories: '🔧' };
-
-interface Product { _id: string; name: string; price: number; image: string; category: string; stock: number; description: string }
+interface Product { 
+  _id: string; 
+  name: string; 
+  price: number; 
+  image: string; 
+  category: string; 
+  description: string; 
+  stock: number 
+}
 
 export default function ProductDetail({ params }: { params: { id: string } }) {
   const { addItem } = useCart();
   const { isInWishlist, toggle: toggleWishlist } = useWishlist();
   const { format: formatPrice } = useCurrency();
   const [product, setProduct] = useState<Product | null>(null);
-  const [related, setRelated] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [qty, setQty] = useState(1);
-  const [added, setAdded] = useState(false);
 
   useEffect(() => {
-    getProduct(params.id)
-      .then(p => {
-        setProduct(p);
-        return getRelatedProducts(params.id);
-      })
-      .then(setRelated)
+    setLoading(true);
+    getProductApi(params.id)
+      .then(setProduct)
       .catch(() => setProduct(null))
       .finally(() => setLoading(false));
   }, [params.id]);
 
-  const handleAdd = () => {
-    if (!product) return;
-    for (let i = 0; i < qty; i++) {
-      addItem({ id: product._id, name: product.name, price: product.price, image: product.image || EMOJI[product.category] || '📦' });
-    }
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
-  };
-
   if (loading) return (
-    <div className="flex justify-center items-center min-h-[60vh]">
-      <div className="animate-spin w-10 h-10 border-2 border-brand border-t-transparent rounded-full" />
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="animate-spin w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full" />
+      <p className="text-gray-500 font-medium animate-pulse">Cargando producto...</p>
     </div>
   );
 
   if (!product) return (
-    <div className="max-w-2xl mx-auto px-4 py-24 text-center">
-      <div className="text-6xl mb-6">🔍</div>
-      <h1 className="text-2xl font-bold text-white mb-4">Producto no encontrado</h1>
-      <Link href="/products" className="btn-primary inline-block">Ver todos los productos</Link>
-    </div>
-  );
-
-  const isImg = product.image?.startsWith('http');
-
-  return (
-    <div className="max-w-6xl mx-auto px-4 py-12">
-      <Link href="/products" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors mb-8">
-        <ArrowLeft className="w-4 h-4" /> Volver a productos
+    <div className="max-w-2xl mx-auto px-4 py-32 text-center">
+      <div className="text-6xl mb-6 grayscale opacity-20">🔍</div>
+      <h1 className="text-4xl font-display font-black text-white mb-4">Producto no encontrado</h1>
+      <p className="text-gray-400 mb-8 max-w-sm mx-auto">Parece que el producto que buscas no existe o ha sido movido.</p>
+      <Link href="/products" className="btn-primary inline-flex items-center gap-2 px-8 py-4">
+        <ArrowLeft className="w-4 h-4" /> Volver al catálogo
       </Link>
 
       <div className="grid md:grid-cols-2 gap-12">
@@ -174,4 +160,6 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
       )}
     </div>
   );
+
+  return <ProductClient product={product} />;
 }

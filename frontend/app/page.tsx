@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { ArrowRight, ShieldCheck, Truck, RotateCcw, Zap, Star, Package, ExternalLink } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Truck, RotateCcw, Zap, Star, Package } from 'lucide-react';
+import { ProductCard } from '@/components/ui/ProductCard';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -82,7 +83,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ── Featured Products (real from DB) ─────────────────── */}
+      {/* ── Featured Products ────────────────────────────────── */}
       {featured.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 py-20">
           <div className="flex items-center justify-between mb-10">
@@ -97,34 +98,13 @@ export default async function Home() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {featured.map((p: any) => (
-              <Link key={p._id} href={`/products/${p._id}`}
-                className="card p-4 group hover:border-indigo-500/30 hover:-translate-y-1 transition-all duration-200 flex flex-col gap-3">
-                {/* Image */}
-                <div className="aspect-square rounded-xl bg-white/[0.03] overflow-hidden flex items-center justify-center">
-                  {p.image?.startsWith('http') ? (
-                    <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  ) : (
-                    <span className="text-4xl">{p.image || '📦'}</span>
-                  )}
-                </div>
-                {/* Info */}
-                <div className="flex-1">
-                  <div className="text-xs text-gray-500 mb-1">{p.category}</div>
-                  <div className="font-medium text-white text-sm leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">{p.name}</div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-indigo-400 font-bold">${p.price.toLocaleString()}</span>
-                  <span className={`text-[10px] ${p.stock > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {p.stock > 0 ? `${p.stock} disponibles` : 'Agotado'}
-                  </span>
-                </div>
-              </Link>
+              <ProductCard key={p._id} p={p} />
             ))}
           </div>
         </section>
       )}
 
-      {/* ── Categories ─────────────────────────────────────────── */}
+      {/* ── Categories ────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-4 py-20">
         <div className="flex items-center justify-between mb-10">
           <div>
@@ -153,7 +133,7 @@ export default async function Home() {
 
       {/* ── Why us ────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-4 pb-24">
-        <div className="card p-8 md:p-12 relative overflow-hidden">
+        <div className="card p-8 md:p-12 relative overflow-hidden bg-white/[0.02]">
           <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-[80px] pointer-events-none" />
           <div className="relative grid md:grid-cols-3 gap-8">
             {[

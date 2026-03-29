@@ -178,3 +178,43 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   });
   console.log(`📧 Corporate password reset email sent to ${to}`);
 }
+
+export async function sendOrderShippedEmail(to: string, customerName: string, orderId: string) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log('📧 Shipping email skipped — EMAIL_USER/EMAIL_PASS not configured');
+    return;
+  }
+
+  const html = `
+  <!DOCTYPE html><html><head><meta charset="UTF-8"><style>${corporateStyle}</style></head>
+  <body>
+    <div class="container">
+      <!-- Banner Premium Corporativo (Unsplash Shipping/Logistics) -->
+      <img src="https://images.unsplash.com/photo-1566576721346-d4a3b4eaad5b?auto=format&fit=crop&q=80&w=600&h=180" class="banner" alt="Shipping Banner" />
+      <div class="header">
+        <div class="logo">Tech<span>Store</span></div>
+        <div style="font-size:14px;color:#6b7280;letter-spacing:1px;text-transform:uppercase;font-weight:600">Despacho Logístico</div>
+      </div>
+      <div class="content" style="text-align:center">
+        <div class="greeting" style="font-size:26px">¡Tu pedido va en camino, ${customerName}!</div>
+        <p class="text" style="font-size:16px;line-height:1.7;margin:25px 0 35px">
+          Excelentes noticias. Tu orden <strong style="color:#4f46e5">#${String(orderId).slice(-8).toUpperCase()}</strong> ha sido procesada por nuestro centro de distribución y ya se encuentra en manos de nuestro courier asociado.
+          <br><br>Pronto recibirás la tecnología de vanguardia que seleccionaste en la puerta de tu hogar.
+        </p>
+        <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/mis-ordenes" class="button">Ver tracking en tiempo real</a>
+      </div>
+      <div class="footer">
+        <p>TechStore Logistics Dept. | Eficiencia y Rapidez 2026</p>
+        <p style="margin-top:8px">Gracias por confiar en TechStore. La tecnología nos conecta.</p>
+      </div>
+    </div>
+  </body></html>`;
+
+  await transporter.sendMail({
+    from: `"TechStore Logística" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `🚚 ¡Tu pedido #${String(orderId).slice(-8).toUpperCase()} ha sido enviado! | TechStore`,
+    html,
+  });
+  console.log(`📧 Shipping notification email sent to ${to}`);
+}

@@ -4,6 +4,7 @@ import { WishlistProvider } from '@/context/WishlistContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
 import { CurrencyProvider } from '@/context/CurrencyContext';
 import { Navbar } from '@/components/ui/Navbar';
+import { SupportChat } from '@/components/ui/SupportChat';
 import './globals.css';
 
 export const metadata: Metadata = {

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getOrders, getProducts, getToken } from '@/lib/api';
-import { Package, ShoppingCart, LayoutDashboard, LogOut, TrendingUp, Zap, Tag } from 'lucide-react';
+import { Package, ShoppingCart, LayoutDashboard, LogOut, TrendingUp, Zap, MessageSquare, Ticket } from 'lucide-react';
 
 export function AdminLayout({ children, title }: { children: React.ReactNode; title: string }) {
   const router = useRouter();
@@ -20,7 +20,8 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
     { href: '/admin/analytics', icon: <TrendingUp className="w-4 h-4" />, label: 'Analytics' },
     { href: '/admin/products', icon: <Package className="w-4 h-4" />, label: 'Productos' },
     { href: '/admin/orders', icon: <ShoppingCart className="w-4 h-4" />, label: 'Órdenes' },
-    { href: '/admin/coupons', icon: <Tag className="w-4 h-4" />, label: 'Cupones' },
+    { href: '/admin/coupons', icon: <Ticket className="w-4 h-4" />, label: 'Cupones' },
+    { href: '/admin/support', icon: <MessageSquare className="w-4 h-4" />, label: 'Soporte' },
     { href: '/admin/import', icon: <Zap className="w-4 h-4" />, label: 'Importar' },
   ];
 
@@ -35,8 +36,13 @@ export function AdminLayout({ children, title }: { children: React.ReactNode; ti
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map(item => (
             <Link key={item.href} href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
-              {item.icon} {item.label}
+              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+              <div className="flex items-center gap-3">
+                {item.icon} {item.label}
+              </div>
+              {item.label === 'Soporte' && (
+                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+              )}
             </Link>
           ))}
         </nav>

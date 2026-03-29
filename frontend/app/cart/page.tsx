@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Trash2, Plus, Minus, ShoppingBag, Heart, ArrowRight, Package, CheckCircle, Tag } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, Heart, ArrowRight, Package, CheckCircle, Tag, Ticket, XCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { validateCoupon } from '@/lib/api';
 
 // Group cart items by category emoji prefix or first word
 function getGroup(name: string): string {
@@ -18,15 +19,34 @@ function getGroup(name: string): string {
 }
 
 export default function CartPage() {
-  const { items, removeItem, updateQty, total, clearCart } = useCart();
+  const { items, removeItem, updateQty, total, clearCart, appliedCoupon, applyCoupon, discountAmount, finalTotal } = useCart();
   const [checkedOff, setCheckedOff] = useState<Set<string>>(new Set());
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   const toggleCheck = (id: string) =>
     setCheckedOff(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const shipping = total >= 99 ? 0 : 9.99;
-  const finalTotal = total + shipping;
+  const grandTotal = finalTotal + shipping;
   const itemCount = items.reduce((s, i) => s + i.quantity, 0);
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCode) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      const coupon = await validateCoupon(couponCode, total);
+      applyCoupon(coupon);
+      setCouponCode('');
+    } catch (err: any) {
+      setCouponError(err.message);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   // Group by category (skill pattern: categorized list view)
   const groups = items.reduce<Record<string, typeof items>>((acc, item) => {
@@ -149,15 +169,28 @@ export default function CartPage() {
                 <span>Subtotal ({itemCount} items)</span>
                 <span>${total.toLocaleString()}</span>
               </div>
+              
+              {appliedCoupon && (
+                <div className="flex justify-between text-emerald-400 font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5" /> Cupón ({appliedCoupon.code})
+                    <button onClick={() => applyCoupon(null)} className="text-gray-500 hover:text-red-400">
+                      <XCircle className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <span>-${discountAmount.toLocaleString()}</span>
+                </div>
+              )}
+
               <div className="flex justify-between text-gray-400">
                 <span>Envío</span>
                 <span className={shipping === 0 ? 'text-green-400' : 'text-white'}>
                   {shipping === 0 ? '✓ Gratis' : `$${shipping}`}
                 </span>
               </div>
-              {shipping > 0 && (
+              {shipping > 0 && total > 0 && (
                 <p className="text-[11px] text-gray-600">
-                  Agrega ${(99 - total).toFixed(2)} más para envío gratis
+                  Agrega ${(99 - total).toFixed(0)} más para envío gratis
                 </p>
               )}
             </div>
@@ -166,8 +199,32 @@ export default function CartPage() {
 
             <div className="flex justify-between font-bold text-white">
               <span>Total</span>
-              <span className="text-xl text-indigo-400">${finalTotal.toFixed(2)}</span>
+              <span className="text-xl text-indigo-400">${grandTotal.toLocaleString()}</span>
             </div>
+
+            {/* Coupon input */}
+            {!appliedCoupon && (
+              <form onSubmit={handleApplyCoupon} className="pt-2">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Ticket className="absolute left-3 top-2.5 w-4 h-4 text-gray-500 pointer-events-none" />
+                    <input 
+                      type="text" 
+                      placeholder="Código de cupón"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder:text-gray-600 outline-none focus:border-indigo-500/50 transition-all uppercase"
+                      value={couponCode}
+                      onChange={e => setCouponCode(e.target.value)}
+                    />
+                  </div>
+                  <button 
+                    disabled={couponLoading || !couponCode}
+                    className="px-4 py-2 rounded-xl bg-white/10 text-xs font-bold text-white hover:bg-white/20 disabled:opacity-50 transition-all">
+                    {couponLoading ? '...' : 'Aplicar'}
+                  </button>
+                </div>
+                {couponError && <p className="text-[10px] text-red-400 mt-2 ml-1">{couponError}</p>}
+              </form>
+            )}
 
             <Link href="/checkout" className="btn-primary w-full text-center block py-3.5 text-base font-semibold shadow-xl shadow-indigo-900/30">
               Proceder al Pago <ArrowRight className="w-4 h-4 inline ml-1" />

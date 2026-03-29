@@ -31,6 +31,8 @@ export default function AdminProducts() {
   const [toggling, setToggling] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [insights, setInsights] = useState<any>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   const authH = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
@@ -55,7 +57,19 @@ export default function AdminProducts() {
   const openEdit = (p: Product) => {
     setEditing(p);
     setForm({ name: p.name, description: p.description, price: p.price, stock: p.stock, category: p.category, image: p.image, published: p.published });
-    setShowForm(true); setError('');
+    setShowForm(true); setError(''); setInsights(null);
+  };
+
+  const fetchInsights = async () => {
+    if (!form.name || !form.category) { setError('Nombre y categoría requeridos para análisis'); return; }
+    setLoadingInsights(true); setInsights(null);
+    try {
+      const res = await fetch(`${API}/api/products/admin/insights?query=${encodeURIComponent(form.name)}&category=${encodeURIComponent(form.category)}`, { headers: authH });
+      const data = await res.json();
+      if (res.ok) setInsights(data);
+      else throw new Error(data.message || 'Error al obtener insights');
+    } catch (err: any) { setError(err.message); }
+    finally { setLoadingInsights(false); }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -180,8 +194,48 @@ export default function AdminProducts() {
                   <input type="checkbox" className="sr-only" checked={form.published} onChange={e => setForm(p => ({ ...p, published: e.target.checked }))} />
                   <span className="text-sm text-gray-300">{form.published ? 'Publicado en la tienda' : 'Guardar como borrador'}</span>
                 </label>
+                {insights && (
+                  <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4 space-y-4">
+                    <div className="flex items-center justify-between border-b border-indigo-500/10 pb-2">
+                      <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Product Pro Insights</div>
+                      <div className="text-[10px] text-gray-500">Score: <span className="text-white font-bold">{insights.analysis.opportunityScore}/100</span></div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-[9px] text-gray-500 uppercase mb-1">Costo Estimado</div>
+                        <div className="text-sm text-white font-mono">${(insights.suppliers[0]?.unitPrice || 0).toFixed(2)} USD</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-gray-500 uppercase mb-1">Margen Proyectado</div>
+                        <div className="text-sm text-green-400 font-mono">
+                          {form.price > 0 ? `${(((form.price - (insights.suppliers[0]?.unitPrice || 0)) / form.price) * 100).toFixed(1)}%` : '---'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[9px] text-gray-500 uppercase mb-2">Proveedores Recomendados</div>
+                      <div className="space-y-1.5">
+                        {insights.suppliers.slice(0, 3).map((s: any, idx: number) => (
+                          <a key={idx} href={s.alibabaUrl} target="_blank" rel="noopener noreferrer" 
+                            className="flex items-center justify-between text-[11px] p-2 bg-white/[0.03] border border-white/[0.05] rounded-lg hover:border-indigo-500/30 transition-colors">
+                            <span className="text-gray-300 truncate max-w-[120px]">{s.name}</span>
+                            <span className="text-indigo-400 font-mono">${s.unitPrice}/ud</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {error && <p className="text-red-400 text-sm bg-red-400/10 px-3 py-2 rounded-xl">{error}</p>}
                 <div className="flex gap-3 pt-2">
+                  {!insights && (
+                    <button type="button" onClick={fetchInsights} disabled={loadingInsights}
+                      className="flex-1 bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs py-3 rounded-xl hover:bg-indigo-500/20 transition-all font-bold">
+                      {loadingInsights ? 'Analizando...' : <><TrendingUp className="w-4 h-4 inline mr-1.5" /> Analizar con Product Pro</>}
+                    </button>
+                  )}
                   <button type="button" onClick={() => setShowForm(false)} className="flex-1 btn-ghost text-sm py-3">Cancelar</button>
                   <button type="submit" disabled={saving} className="flex-1 btn-primary text-sm py-3 disabled:opacity-50">
                     {saving ? 'Guardando...' : <><Check className="w-4 h-4 inline mr-1" />{editing ? 'Actualizar' : 'Crear'}</>}

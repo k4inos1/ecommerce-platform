@@ -1,10 +1,22 @@
 import { Router, Request, Response } from 'express';
 import { Product } from '../models/Product';
 import { protect, adminOnly, AuthRequest } from '../middleware/auth';
+import multer from 'multer';
+import { uploadImage } from '../services/cloudinary';
 
 const router = Router();
 
+// Configure Multer to store products in memory buffer for easy upload to Cloudinary
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
+
 // ─── PUBLIC ─────────────────────────────────────────────────────────────────
+
+const CACHE = new Map<string, { data: any; exp: number }>();
+const TTL = 60 * 1000; // 1 minute
 
 // GET /api/products — only published products for the store
 router.get('/', async (req: Request, res: Response) => {
@@ -33,6 +45,9 @@ router.get('/', async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Server error', error: err });
   }
 });
+
+// Helper to clear cache
+export const clearProductCache = () => CACHE.delete('products_base');
 
 // GET /api/products/:id — public
 router.get('/:id', async (req: Request, res: Response) => {
@@ -91,6 +106,7 @@ router.get('/admin/all', protect, adminOnly, async (req: AuthRequest, res: Respo
 router.post('/', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.create({ published: true, source: 'manual', ...req.body });
+    clearProductCache();
     res.status(201).json(product);
   } catch (err) {
     res.status(400).json({ message: 'Invalid data', error: err });
@@ -102,6 +118,7 @@ router.put('/:id', protect, adminOnly, async (req: AuthRequest, res: Response) =
   try {
     const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!product) return res.status(404).json({ message: 'Product not found' });
+    clearProductCache();
     res.json(product);
   } catch (err) {
     res.status(400).json({ message: 'Invalid data', error: err });
@@ -118,6 +135,7 @@ router.patch('/:id/publish', protect, adminOnly, async (req: AuthRequest, res: R
       { new: true }
     );
     if (!product) return res.status(404).json({ message: 'Product not found' });
+    clearProductCache();
     res.json({ message: `Product ${published ? 'published' : 'unpublished'}`, product });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
@@ -128,7 +146,50 @@ router.patch('/:id/publish', protect, adminOnly, async (req: AuthRequest, res: R
 router.delete('/:id', protect, adminOnly, async (req: AuthRequest, res: Response) => {
   try {
     await Product.findByIdAndDelete(req.params.id);
+    clearProductCache();
     res.json({ message: 'Product removed' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+/**
+ * @route   POST /api/products/upload
+ * @desc    Upload product image to Cloudinary (Admin only)
+ * @access  Private/Admin
+ */
+router.post('/upload', protect, adminOnly, upload.single('image'), async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image file provided' });
+    }
+
+    const { url, public_id } = await uploadImage(req.file.buffer);
+    
+    res.status(200).json({
+      message: 'Image uploaded successfully',
+      url,
+      public_id
+    });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ message: 'Error uploading to Cloudinary', error: err });
+  }
+});
+
+// GET /api/products/admin/insights — admin: get market analysis and suppliers
+router.get('/admin/insights', protect, adminOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const { query, category } = req.query;
+    if (!query || !category) return res.status(400).json({ message: 'Missing query or category' });
+
+    const { analyzeMarket } = await import('../services/marketAnalysis');
+    const { findSuppliers } = await import('../services/supplierFinder');
+
+    const analysis = analyzeMarket(query as string, category as string);
+    const suppliers = findSuppliers(query as string, category as string);
+
+    res.json({ analysis, suppliers });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
   }
