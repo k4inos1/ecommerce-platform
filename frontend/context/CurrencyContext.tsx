@@ -12,7 +12,7 @@ interface CurrencyContextType {
   convert: (amount: number) => number;
 }
 
-// Approximate exchange rate: 1 USD ≈ 940 CLP (updated periodically)
+// Fixed exchange rate: 1 USD = 940 CLP (update this constant to adjust the rate)
 const USD_TO_CLP = 940;
 
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
