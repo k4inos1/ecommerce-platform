@@ -7,7 +7,7 @@ import { getToken } from '@/lib/api';
 import {
   Search, Download, Calculator, TrendingUp, CheckCircle, XCircle,
   ExternalLink, BarChart2, Package, FileText, Star, Clock, Shield,
-  GitCompare,
+  GitCompare, History,
 } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -19,6 +19,7 @@ const TABS = [
   { id: 'market', label: 'Mercado', icon: BarChart2 },
   { id: 'suppliers', label: 'Proveedores', icon: Package },
   { id: 'optimize', label: 'Optimizar', icon: FileText },
+  { id: 'history', label: 'Historial', icon: History },
 ];
 
 type ScraperEngine = 'aliexpress' | 'ebay';
@@ -68,6 +69,10 @@ export default function AdminImport() {
   const [optimized, setOptimized] = useState<any>(null);
   const [optimizeName, setOptimizeName] = useState('');
 
+  // History state
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
   // Calculator state
   const [calcOpen, setCalcOpen] = useState(false);
   const [calcProduct, setCalcProduct] = useState<any>(null);
@@ -93,6 +98,11 @@ export default function AdminImport() {
       if (prev.length > 1) return prev.filter(e => e !== engine); // keep at least one
       return prev;
     });
+  };
+
+  const handleTabClick = (tabId: string) => {
+    setTab(tabId);
+    if (tabId === 'history' && !historyLoaded) handleHistory();
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -129,6 +139,11 @@ export default function AdminImport() {
     if (!optimizeName.trim()) return;
     const data = await apiFetch(`${API}/api/scraper/optimize?name=${encodeURIComponent(optimizeName)}&category=${category}`);
     if (data) setOptimized(data);
+  };
+
+  const handleHistory = async () => {
+    const data = await apiFetch(`${API}/api/scraper/history`);
+    if (data) { setHistory(data.results || []); setHistoryLoaded(true); }
   };
 
   const handleImport = async (p: any) => {
@@ -268,7 +283,7 @@ export default function AdminImport() {
           {TABS.map(t => {
             const Icon = t.icon;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)}
+              <button key={t.id} onClick={() => handleTabClick(t.id)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${tab === t.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
                 <Icon className="w-3.5 h-3.5" /> {t.label}
               </button>
@@ -582,6 +597,70 @@ export default function AdminImport() {
             )}
             {!optimized && !loading && (
               <div className="text-center py-16 text-gray-600"><FileText className="w-10 h-10 mx-auto mb-3 opacity-30" /><div className="text-sm">Ingresa el nombre de un producto para generar listing optimizado con SEO</div></div>
+            )}
+          </div>
+        )}
+
+        {/* ══ HISTORY TAB ══ */}
+        {tab === 'history' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="card p-4 flex items-start gap-3 flex-1">
+                <History className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+                <div className="text-xs text-gray-400">Registro de las últimas <span className="text-white font-medium">50 sesiones</span> de scraping guardadas en la base de datos.</div>
+              </div>
+              <button onClick={handleHistory} disabled={loading}
+                className="ml-3 p-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-colors disabled:opacity-50">
+                {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <History className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {loading && (
+              <div className="flex justify-center py-10">
+                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+
+            {!loading && historyLoaded && history.length === 0 && (
+              <div className="text-center py-16 text-gray-600">
+                <History className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <div className="text-sm">No hay sesiones de scraping guardadas aún</div>
+              </div>
+            )}
+
+            {!loading && history.length > 0 && (
+              <div className="card overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-b border-white/[0.06]">
+                      <th className="px-5 py-3 font-medium">Búsqueda</th>
+                      <th className="px-5 py-3 font-medium">Fuente</th>
+                      <th className="px-5 py-3 font-medium text-right">Productos</th>
+                      <th className="px-5 py-3 font-medium text-right">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {history.map((h: any) => {
+                      const sourceKey = String(h.source || '').toLowerCase();
+                      const meta = ENGINE_BY_SOURCE[sourceKey] ?? null;
+                      return (
+                        <tr key={h._id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="px-5 py-3 text-white font-medium">{h.query}</td>
+                          <td className="px-5 py-3">
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full border ${meta ? meta.color : 'text-gray-400 bg-gray-400/10 border-gray-500/20'}`}>
+                              {h.source || '—'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-right text-indigo-400 font-mono font-medium">{h.count}</td>
+                          <td className="px-5 py-3 text-right text-gray-500 text-xs">
+                            {new Date(h.createdAt).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
