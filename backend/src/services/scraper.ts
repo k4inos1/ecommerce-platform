@@ -3,6 +3,8 @@ import * as cheerio from 'cheerio';
 import { chromium } from 'playwright';
 import { getChromiumExecutablePath } from '../utils/browser';
 
+export type ScraperEngine = 'aliexpress' | 'ebay';
+
 export interface ScrapedProduct {
   name: string;
   price: number;
@@ -16,6 +18,14 @@ export interface ScrapedProduct {
   trend: 'rising' | 'stable' | 'declining';
   source: string;
   sourceUrl: string;
+}
+
+/** Result set from /compare — one array per scraped engine */
+export interface EngineCompareResult {
+  engine: ScraperEngine;
+  label: string;
+  products: ScrapedProduct[];
+  error?: string;
 }
 
 function guessCategory(name: string): string {
@@ -191,10 +201,90 @@ async function scrapeEbayCheerio(query: string, limit: number): Promise<ScrapedP
 }
 
 /**
- * Main export: tries sources in cascade order
- * 1. AliExpress via Playwright
- * 2. eBay via cheerio (fast, reliable)
- * 3. eBay via Playwright (JS-rendered)
+ * Scrape a single engine and return its results.
+ * Exported so routes can scrape one engine at a time.
+ */
+export async function scrapeEngine(
+  engine: ScraperEngine,
+  query: string,
+  limit = 12,
+): Promise<ScrapedProduct[]> {
+  switch (engine) {
+    case 'aliexpress': {
+      const results = await scrapeAliExpressPlaywright(query, limit);
+      if (results.length > 0) return results;
+      throw new Error(`AliExpress returned no results for query "${query}".`);
+    }
+    case 'ebay': {
+      // Try fast cheerio first, fall back to Playwright
+      try {
+        const results = await scrapeEbayCheerio(query, limit);
+        if (results.length > 0) return results;
+      } catch {
+        // cheerio failed — try Playwright
+      }
+      return scrapeEbayPlaywright(query, limit);
+    }
+  }
+}
+
+/**
+ * Scrape the given engines concurrently and merge results into a flat list.
+ * Falls back to the cascade strategy when no engines are specified.
+ */
+export async function scrapeByEngines(
+  query: string,
+  limit = 12,
+  engines: ScraperEngine[] = ['aliexpress', 'ebay'],
+): Promise<ScrapedProduct[]> {
+  console.log(`🔍 Scraping "${query}" — engines: ${engines.join(', ')} — limit ${limit}`);
+
+  const perEngine = Math.ceil(limit / engines.length);
+  const settled = await Promise.allSettled(
+    engines.map((eng) => scrapeEngine(eng, query, perEngine)),
+  );
+
+  const combined: ScrapedProduct[] = [];
+  for (const result of settled) {
+    if (result.status === 'fulfilled') combined.push(...result.value);
+    else console.warn('Engine failed:', result.reason);
+  }
+
+  if (combined.length === 0) {
+    throw new Error(`All selected scraping engines (${engines.join(', ')}) failed to return results.`);
+  }
+  return combined.slice(0, limit);
+}
+
+/**
+ * Scrape all available engines in parallel and return results grouped by
+ * engine — used by the /compare endpoint.
+ */
+export async function compareEngines(
+  query: string,
+  limit = 8,
+): Promise<EngineCompareResult[]> {
+  const engines: Array<{ engine: ScraperEngine; label: string }> = [
+    { engine: 'aliexpress', label: 'AliExpress' },
+    { engine: 'ebay', label: 'eBay' },
+  ];
+
+  const results = await Promise.allSettled(
+    engines.map(({ engine }) => scrapeEngine(engine, query, limit)),
+  );
+
+  return engines.map(({ engine, label }, i) => {
+    const settled = results[i];
+    if (settled.status === 'fulfilled') {
+      return { engine, label, products: settled.value };
+    }
+    return { engine, label, products: [], error: (settled.reason as Error).message };
+  });
+}
+
+/**
+ * Legacy cascade export — kept for backward compatibility.
+ * Prefers AliExpress, falls back to eBay.
  */
 export async function scrapeProducts(query: string, limit = 12): Promise<ScrapedProduct[]> {
   console.log(`🔍 Scraping "${query}" — limit ${limit}`);

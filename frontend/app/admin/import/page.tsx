@@ -6,7 +6,8 @@ import { AdminLayout } from '@/components/ui/AdminLayout';
 import { getToken } from '@/lib/api';
 import {
   Search, Download, Calculator, TrendingUp, CheckCircle, XCircle,
-  ExternalLink, BarChart2, Users, Package, FileText, Star, Clock, Shield
+  ExternalLink, BarChart2, Package, FileText, Star, Clock, Shield,
+  GitCompare,
 } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -14,10 +15,28 @@ const CATEGORIES = ['Laptops', 'Phones', 'Audio', 'Tablets', 'Wearables', 'Monit
 const COMP_COLOR: Record<string, string> = { low: 'text-green-400 bg-green-400/10 border-green-500/20', medium: 'text-yellow-400 bg-yellow-400/10 border-yellow-500/20', high: 'text-red-400 bg-red-400/10 border-red-500/20' };
 const TABS = [
   { id: 'search', label: 'Buscar', icon: Search },
+  { id: 'compare', label: 'Comparar', icon: GitCompare },
   { id: 'market', label: 'Mercado', icon: BarChart2 },
   { id: 'suppliers', label: 'Proveedores', icon: Package },
   { id: 'optimize', label: 'Optimizar', icon: FileText },
 ];
+
+type ScraperEngine = 'aliexpress' | 'ebay';
+type EngineMeta = { label: string; color: string; dot: string };
+
+const ENGINE_META: Record<ScraperEngine, EngineMeta> = {
+  aliexpress: { label: 'AliExpress', color: 'text-orange-400 bg-orange-400/10 border-orange-500/20', dot: 'bg-orange-400' },
+  ebay:       { label: 'eBay',       color: 'text-blue-400 bg-blue-400/10 border-blue-500/20',     dot: 'bg-blue-400' },
+};
+const ENGINE_ENTRIES = Object.entries(ENGINE_META) as Array<[ScraperEngine, EngineMeta]>;
+
+// Pre-computed reverse lookup: source (label or key) → ENGINE_META
+const ENGINE_BY_SOURCE: Record<string, EngineMeta> = Object.fromEntries(
+  ENGINE_ENTRIES.flatMap(([key, meta]) => [
+    [key, meta],
+    [meta.label.toLowerCase(), meta],
+  ]),
+);
 
 export default function AdminImport() {
   const router = useRouter();
@@ -28,10 +47,16 @@ export default function AdminImport() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Engine selection (for "Buscar" tab)
+  const [selectedEngines, setSelectedEngines] = useState<ScraperEngine[]>(['aliexpress', 'ebay']);
+
   // Search state
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState<string | null>(null);
+
+  // Compare state
+  const [compareResults, setCompareResults] = useState<any[]>([]);
 
   // Market state
   const [market, setMarket] = useState<any>(null);
@@ -62,11 +87,27 @@ export default function AdminImport() {
     finally { setLoading(false); }
   }, [token]);
 
+  const toggleEngine = (engine: ScraperEngine) => {
+    setSelectedEngines(prev => {
+      if (!prev.includes(engine)) return [...prev, engine];
+      if (prev.length > 1) return prev.filter(e => e !== engine); // keep at least one
+      return prev;
+    });
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-    const data = await apiFetch(`${API}/api/scraper/search?q=${encodeURIComponent(query)}&limit=12`);
+    const enginesParam = selectedEngines.join(',');
+    const data = await apiFetch(`${API}/api/scraper/search?q=${encodeURIComponent(query)}&limit=12&engines=${enginesParam}`);
     if (data) setSearchResults(data.products || []);
+  };
+
+  const handleCompare = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    const data = await apiFetch(`${API}/api/scraper/compare?q=${encodeURIComponent(query)}&limit=8`);
+    if (data) setCompareResults(data.results || []);
   };
 
   const handleMarket = async (e: React.FormEvent) => {
@@ -107,21 +148,75 @@ export default function AdminImport() {
   };
 
   // ── Shared search bar ──
-  const SearchBar = ({ onSubmit, placeholder = 'Ej: wireless headphones, smart watch...' }: { onSubmit: (e: React.FormEvent) => void; placeholder?: string }) => (
-    <form onSubmit={onSubmit} className="flex gap-3">
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder={placeholder}
-          className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none" />
+  const SearchBar = ({ onSubmit, showEngines = false, placeholder = 'Ej: wireless headphones, smart watch...' }: { onSubmit: (e: React.FormEvent) => void; showEngines?: boolean; placeholder?: string }) => (
+    <div className="space-y-3">
+      <form onSubmit={onSubmit} className="flex gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <input value={query} onChange={e => setQuery(e.target.value)} placeholder={placeholder}
+            className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none" />
+        </div>
+        <select value={category} onChange={e => setCategory(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-300 focus:border-indigo-500 focus:outline-none">
+          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <button type="submit" disabled={loading} className="btn-primary px-5 disabled:opacity-50">
+          {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Search className="w-4 h-4" />}
+        </button>
+      </form>
+      {showEngines && (
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-500">Motores:</span>
+          {ENGINE_ENTRIES.map(([key, meta]) => (
+            <button key={key} type="button" onClick={() => toggleEngine(key)}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-all ${selectedEngines.includes(key) ? meta.color : 'text-gray-600 bg-transparent border-white/10'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${selectedEngines.includes(key) ? meta.dot : 'bg-gray-600'}`} />
+              {meta.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Reusable product card ──
+  const ProductCard = ({ p, showSource = false }: { p: any; showSource?: boolean }) => (
+    <div className={`card p-4 flex flex-col gap-3 ${p.margin >= 30 ? '' : 'opacity-60'}`}>
+      <div className="flex items-start gap-2">
+        <div className="font-medium text-white text-sm leading-snug flex-1 line-clamp-2">{p.name}</div>
+        {p.margin >= 30 ? <CheckCircle className="w-4 h-4 text-green-400 shrink-0" /> : <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
       </div>
-      <select value={category} onChange={e => setCategory(e.target.value)}
-        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-300 focus:border-indigo-500 focus:outline-none">
-        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-      </select>
-      <button type="submit" disabled={loading} className="btn-primary px-5 disabled:opacity-50">
-        {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Search className="w-4 h-4" />}
-      </button>
-    </form>
+      {showSource && p.source && (() => {
+        const sourceKey = String(p.source).toLowerCase();
+        const meta = ENGINE_BY_SOURCE[sourceKey] ?? null;
+        return (
+          <span className={`text-[10px] self-start px-2 py-0.5 rounded-full border ${meta ? meta.color : 'text-gray-400 bg-gray-400/10 border-gray-500/20'}`}>
+            {p.source}
+          </span>
+        );
+      })()}
+      <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+        <div className="bg-white/[0.03] border border-white/5 rounded-lg p-2"><div className="text-gray-500 text-[10px]">Precio</div><div className="font-bold text-white">${p.price}</div></div>
+        <div className="bg-white/[0.03] border border-white/5 rounded-lg p-2"><div className="text-gray-500 text-[10px]">Margen</div><div className={`font-bold ${p.margin >= 30 ? 'text-green-400' : 'text-red-400'}`}>{p.margin}%</div></div>
+        <div className="bg-white/[0.03] border border-white/5 rounded-lg p-2"><div className="text-gray-500 text-[10px]">Demanda</div><div className={`font-bold ${p.demandScore >= 7 ? 'text-green-400' : p.demandScore >= 5 ? 'text-yellow-400' : 'text-red-400'}`}>{p.demandScore}/10</div></div>
+      </div>
+      <div className="flex gap-1.5 flex-wrap">
+        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${COMP_COLOR[p.competitionLevel]}`}>{p.competitionLevel === 'low' ? '↓ Baja' : p.competitionLevel === 'medium' ? '→ Media' : '↑ Alta'} competencia</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{p.category}</span>
+        {p.trend === 'rising' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">📈 En alza</span>}
+      </div>
+      <div className="flex gap-2 mt-auto">
+        <button onClick={() => handleCalc(p)} className="flex-1 btn-ghost text-xs py-2 gap-1"><Calculator className="w-3.5 h-3.5" /> Calcular</button>
+        {p.sourceUrl && <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>}
+        {imported.has(p.name) ? (
+          <div className="flex-1 flex items-center justify-center gap-1 text-xs text-green-400 font-medium"><CheckCircle className="w-3.5 h-3.5" /> Importado</div>
+        ) : (
+          <button onClick={() => handleImport(p)} disabled={importing === p.name || p.margin < 30} className="flex-1 btn-primary text-xs py-2 disabled:opacity-40">
+            {importing === p.name ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" /> : <Download className="w-3.5 h-3.5" />} Importar
+          </button>
+        )}
+      </div>
+    </div>
   );
 
   return (
@@ -188,44 +283,66 @@ export default function AdminImport() {
           <div className="space-y-6">
             <div className="card p-4 flex items-start gap-3">
               <TrendingUp className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
-              <div className="text-xs text-gray-400">Busca productos en AliExpress. Solo puedes importar los que tengan <span className="text-green-400 font-medium">margen ≥ 30%</span> según el skill.</div>
+              <div className="text-xs text-gray-400">Busca productos en los motores seleccionados. Solo puedes importar los que tengan <span className="text-green-400 font-medium">margen ≥ 30%</span> según el análisis.</div>
             </div>
-            <SearchBar onSubmit={handleSearch} placeholder="Ej: wireless headphones, gaming chair..." />
+            <SearchBar onSubmit={handleSearch} showEngines placeholder="Ej: wireless headphones, gaming chair..." />
             {searchResults.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((p, i) => (
-                  <div key={i} className={`card p-4 flex flex-col gap-3 ${p.margin >= 30 ? '' : 'opacity-60'}`}>
-                    <div className="flex items-start gap-2">
-                      <div className="font-medium text-white text-sm leading-snug flex-1 line-clamp-2">{p.name}</div>
-                      {p.margin >= 30 ? <CheckCircle className="w-4 h-4 text-green-400 shrink-0" /> : <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
-                      <div className="bg-white/[0.03] border border-white/5 rounded-lg p-2"><div className="text-gray-500 text-[10px]">Precio</div><div className="font-bold text-white">${p.price}</div></div>
-                      <div className="bg-white/[0.03] border border-white/5 rounded-lg p-2"><div className="text-gray-500 text-[10px]">Margen</div><div className={`font-bold ${p.margin >= 30 ? 'text-green-400' : 'text-red-400'}`}>{p.margin}%</div></div>
-                      <div className="bg-white/[0.03] border border-white/5 rounded-lg p-2"><div className="text-gray-500 text-[10px]">Demanda</div><div className={`font-bold ${p.demandScore >= 7 ? 'text-green-400' : p.demandScore >= 5 ? 'text-yellow-400' : 'text-red-400'}`}>{p.demandScore}/10</div></div>
-                    </div>
-                    <div className="flex gap-1.5 flex-wrap">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${COMP_COLOR[p.competitionLevel]}`}>{p.competitionLevel === 'low' ? '↓ Baja' : p.competitionLevel === 'medium' ? '→ Media' : '↑ Alta'} competencia</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{p.category}</span>
-                      {p.trend === 'rising' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">📈 En alza</span>}
-                    </div>
-                    <div className="flex gap-2 mt-auto">
-                      <button onClick={() => handleCalc(p)} className="flex-1 btn-ghost text-xs py-2 gap-1"><Calculator className="w-3.5 h-3.5" /> Calcular</button>
-                      {p.sourceUrl && <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-colors"><ExternalLink className="w-3.5 h-3.5" /></a>}
-                      {imported.has(p.name) ? (
-                        <div className="flex-1 flex items-center justify-center gap-1 text-xs text-green-400 font-medium"><CheckCircle className="w-3.5 h-3.5" /> Importado</div>
-                      ) : (
-                        <button onClick={() => handleImport(p)} disabled={importing === p.name || p.margin < 30} className="flex-1 btn-primary text-xs py-2 disabled:opacity-40">
-                          {importing === p.name ? <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" /> : <Download className="w-3.5 h-3.5" />} Importar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                {searchResults.map((p, i) => <ProductCard key={i} p={p} showSource />)}
               </div>
             )}
             {searchResults.length === 0 && !loading && (
               <div className="text-center py-16 text-gray-600"><Search className="w-10 h-10 mx-auto mb-3 opacity-30" /><div className="text-sm">Busca un producto para ver resultados y análisis</div></div>
+            )}
+          </div>
+        )}
+
+        {/* ══ COMPARE TAB ══ */}
+        {tab === 'compare' && (
+          <div className="space-y-6">
+            <div className="card p-4 flex items-start gap-3">
+              <GitCompare className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
+              <div className="text-xs text-gray-400">
+                Compara resultados de <span className="text-orange-400 font-medium">AliExpress</span> y <span className="text-blue-400 font-medium">eBay</span> en paralelo para el mismo producto. Ambos motores se consultan simultáneamente.
+              </div>
+            </div>
+            <SearchBar onSubmit={handleCompare} placeholder="Ej: wireless headphones, smart watch..." />
+            {compareResults.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {compareResults.map((engineResult: any) => {
+                  const engineKey = engineResult.engine as ScraperEngine;
+                  const meta = ENGINE_META[engineKey] || { label: engineResult.label, color: 'text-gray-400 bg-gray-400/10 border-gray-500/20', dot: 'bg-gray-400' };
+                  return (
+                    <div key={engineResult.engine} className="space-y-3">
+                      {/* Engine header */}
+                      <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${meta.color}`}>
+                        <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
+                        <span className="font-semibold text-sm">{engineResult.label}</span>
+                        {engineResult.error ? (
+                          <span className="ml-auto text-xs opacity-70">Error: {engineResult.error}</span>
+                        ) : (
+                          <span className="ml-auto text-xs opacity-70">{engineResult.products.length} resultados</span>
+                        )}
+                      </div>
+                      {engineResult.products.length > 0 ? (
+                        <div className="space-y-3">
+                          {engineResult.products.map((p: any, i: number) => <ProductCard key={i} p={p} />)}
+                        </div>
+                      ) : (
+                        <div className="card p-6 text-center text-gray-600 text-sm">
+                          {engineResult.error ? '❌ Motor no disponible en este momento' : 'Sin resultados'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {compareResults.length === 0 && !loading && (
+              <div className="text-center py-16 text-gray-600">
+                <GitCompare className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <div className="text-sm">Ingresa un producto para comparar precios entre AliExpress y eBay</div>
+              </div>
             )}
           </div>
         )}
