@@ -32,7 +32,7 @@ export const uploadImage = (
         {
           folder,
           resource_type: 'image',
-          transformation: [{ width: 800, crop: 'limit', quality: 'auto' }],
+          transformation: [{ width: 800, crop: 'limit', quality: 'auto', fetch_format: 'auto' }],
         },
         (error, result) => {
           if (error) return reject(error);
@@ -61,7 +61,7 @@ export const uploadImageUrl = async (
   const result = await cloudinary.uploader.upload(imageUrl, {
     folder,
     resource_type: 'image',
-    transformation: [{ width: 800, crop: 'limit', quality: 'auto' }],
+    transformation: [{ width: 800, crop: 'limit', quality: 'auto', fetch_format: 'auto' }],
   });
   return { url: result.secure_url, public_id: result.public_id };
 };
