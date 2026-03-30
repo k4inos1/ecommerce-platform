@@ -3,7 +3,13 @@ import { Schema, Document, model } from 'mongoose';
 export interface IScrapedProduct {
   name: string;
   price: number;
-  image: string;
+  image: string;                    // Original image URL from source
+  cloudinaryImage: {                // Cloudinary hosted image (always present, possibly with empty/default values)
+    url: string;                    // Secure HTTPS URL from Cloudinary
+    publicId: string;               // Cloudinary public ID for deletion/updates
+    width: number;
+    height: number;
+  };
   description: string;
   category: string;
   supplierPrice: number;
@@ -28,6 +34,12 @@ const ScrapedProductSchema = new Schema<IScrapedProduct>(
     name: { type: String, required: true },
     price: { type: Number, default: 0 },
     image: { type: String, default: '' },
+    cloudinaryImage: {
+      url: { type: String, default: '' },
+      publicId: { type: String, default: '' },
+      width: { type: Number, default: 0 },
+      height: { type: Number, default: 0 },
+    },
     description: { type: String, default: '' },
     category: { type: String, default: 'Accessories' },
     supplierPrice: { type: Number, default: 0 },

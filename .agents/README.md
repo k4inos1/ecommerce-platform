@@ -7,6 +7,7 @@ Este directorio documenta las **habilidades (skills)** disponibles para el agent
 ```
 .agents/
 └── skills/
+    ├── web-scraper/            ← Framework genérico de web scraping
     ├── product-search.yml      ← Busca productos en AliExpress / eBay
     ├── market-analysis.yml     ← Analiza mercado con DuckDuckGo + eBay
     ├── supplier-finder.yml     ← Encuentra proveedores en Alibaba
@@ -19,15 +20,16 @@ Este directorio documenta las **habilidades (skills)** disponibles para el agent
 ```
 Agente Copilot
      │
-     ├─ product-search    →  GET  /api/scraper/search
-     ├─ market-analysis   →  GET  /api/scraper/market
-     ├─ supplier-finder   →  GET  /api/scraper/suppliers
+     ├─ web-scraper (framework) →  Metodología genérica de scraping
+     │
+     ├─ product-search    →  GET  /api/scraper/search (AliExpress + eBay)
+     ├─ market-analysis   →  GET  /api/scraper/market (DuckDuckGo + eBay)
+     ├─ supplier-finder   →  GET  /api/scraper/suppliers (Alibaba)
      ├─ listing-optimizer →  GET  /api/scraper/optimize
      └─ profit-calculator →  POST /api/scraper/calculate
 ```
 
-Todos los endpoints requieren autenticación JWT con rol **admin**.  
-Los endpoints de scraping están limitados a **10 req/min por IP**.
+**Nota**: `web-scraper` es un framework educativo y de referencia para nuevas implementaciones. Los `.yml` son APIs específicas ya implementadas en el backend.
 
 ## Flujo de Trabajo Típico
 
