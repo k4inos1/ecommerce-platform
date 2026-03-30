@@ -1,7 +1,10 @@
 import { Router, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { v2 as cloudinary } from 'cloudinary';
-import { scrapeProducts } from '../services/scraper';
+import { z } from 'zod';
+
+import { scrapeByEngines, compareEngines } from '../services/scraper';
+import { enrichProductsWithCloudinary } from '../services/scraperCloudinary';
+import { uploadImageFromUrl, isAllowedImageUrl } from '../services/cloudinaryService';
 import { calculateProfit } from '../utils/profitCalculator';
 import { analyzeMarket } from '../services/marketAnalysis';
 import { findSuppliers } from '../services/supplierFinder';
@@ -9,160 +12,352 @@ import { optimizeListing } from '../services/listingOptimizer';
 import { protect, adminOnly, AuthRequest } from '../middleware/auth';
 import { Product } from '../models/Product';
 import { ScrapedResult } from '../models/ScrapedResult';
+import logger from '../utils/logger';
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+import {
+  ScraperSearchParamsSchema,
+  ScraperCompareParamsSchema,
+  MarketAnalysisParamsSchema,
+  SupplierFinderParamsSchema,
+  ListingOptimizerParamsSchema,
+  ProfitCalculatorBodySchema,
+  ImportProductBodySchema,
+} from '../types/scraper';
 
 const router = Router();
 
-// Scraping routes hit external web services — limit to 10 req/min per IP to
-// prevent accidental abuse and protect against compromised admin tokens.
+/**
+ * ─────────────────────────────────────────────────────────────
+ * RATE LIMITING
+ * ─────────────────────────────────────────────────────────────
+ * 
+ * Scraping routes hit external web services. Rate limit to 10 req/min
+ * per IP to prevent accidental abuse and protect against compromised
+ * admin tokens.
+ */
 const scraperLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: 'Demasiadas solicitudes de scraping. Espera un momento e intenta de nuevo.' },
+  message: {
+    message: 'Demasiadas solicitudes de scraping. Espera un momento e intenta de nuevo.',
+  },
 });
 
-/** GET /api/scraper/search?q=laptops&limit=12 */
-router.get('/search', scraperLimiter, protect, adminOnly, async (req: AuthRequest, res: Response) => {
-  try {
-    const query = (req.query.q as string) || '';
-    const limit = Math.min(Number(req.query.limit) || 12, 24);
-    if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
-    const products = await scrapeProducts(query, limit);
+/**
+ * ─────────────────────────────────────────────────────────────
+ * UTILITY FUNCTIONS
+ * ─────────────────────────────────────────────────────────────
+ */
 
-    // Persist scraping results to MongoDB only when we have data (non-blocking)
-    if (products.length > 0) {
-      ScrapedResult.create({ query, source: products[0].source, products, count: products.length })
-        .catch((e: Error) => console.warn('ScrapedResult save failed:', e.message));
-    }
+/**
+ * Parse and validate query parameters using Zod schema
+ */
+const parseQueryParams = <T>(schema: z.ZodSchema<T>, input: any): T => {
+  return schema.parse(input);
+};
 
-    res.json({ products, count: products.length });
-  } catch (err) {
-    res.status(500).json({ message: 'Scraping failed', error: String(err) });
-  }
-});
+/**
+ * Handle Zod validation errors with detailed feedback
+ */
+const handleValidationError = (error: z.ZodError, res: Response) => {
+  const formatted = error.errors.map((e) => ({
+    field: e.path?.join('.') || 'unknown',
+    message: e.message,
+  }));
+  logger.warn(`Validation error: ${JSON.stringify(formatted)}`);
+  return res.status(400).json({
+    message: 'Validation failed',
+    errors: formatted,
+  });
+};
 
-/** GET /api/scraper/market?q=laptops&category=Laptops */
-router.get('/market', scraperLimiter, protect, adminOnly, async (req: AuthRequest, res: Response) => {
-  try {
-    const query = (req.query.q as string) || '';
-    const category = (req.query.category as string) || 'Accessories';
-    if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
-    const analysis = await analyzeMarket(query, category);
-    res.json(analysis);
-  } catch (err) {
-    res.status(500).json({ message: 'Market analysis failed', error: String(err) });
-  }
-});
+/**
+ * ─────────────────────────────────────────────────────────────
+ * ENDPOINTS
+ * ─────────────────────────────────────────────────────────────
+ */
 
-/** GET /api/scraper/suppliers?q=wireless headphones&category=Audio */
-router.get('/suppliers', scraperLimiter, protect, adminOnly, async (req: AuthRequest, res: Response) => {
-  try {
-    const query = (req.query.q as string) || '';
-    const category = (req.query.category as string) || 'Accessories';
-    const count = Math.min(Number(req.query.count) || 6, 10);
-    if (!query.trim()) return res.status(400).json({ message: 'Query is required' });
-    const suppliers = await findSuppliers(query, category, count);
-    res.json({ suppliers, count: suppliers.length });
-  } catch (err) {
-    res.status(500).json({ message: 'Supplier scraping failed', error: String(err) });
-  }
-});
+/**
+ * GET /api/scraper/search
+ * Search for products across multiple marketplaces with optional Cloudinary enrichment
+ */
+router.get(
+  '/search',
+  scraperLimiter,
+  protect,
+  adminOnly,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const params = parseQueryParams(ScraperSearchParamsSchema, req.query);
 
-/** GET /api/scraper/optimize?name=Wireless Headphones&category=Audio */
-router.get('/optimize', protect, adminOnly, (req: AuthRequest, res: Response) => {
-  const name = (req.query.name as string) || '';
-  const category = (req.query.category as string) || 'Accessories';
-  if (!name.trim()) return res.status(400).json({ message: 'name is required' });
-  res.json(optimizeListing(name, category));
-});
+      logger.info(
+        `📦 /search: query="${params.q}" limit=${params.limit}`
+      );
 
-/** POST /api/scraper/calculate */
-router.post('/calculate', protect, adminOnly, (req: AuthRequest, res: Response) => {
-  const { sellingPrice, supplierCost, shippingCost, otherCosts } = req.body;
-  if (!sellingPrice || !supplierCost) return res.status(400).json({ message: 'sellingPrice and supplierCost required' });
-  res.json(calculateProfit({ sellingPrice: Number(sellingPrice), supplierCost: Number(supplierCost), shippingCost: Number(shippingCost) || undefined, otherCosts: Number(otherCosts) || undefined }));
-});
+      let products = await scrapeByEngines(params.q, params.limit);
 
-// Allowed image host patterns for Cloudinary uploads (prevents SSRF / quota abuse)
-const ALLOWED_IMAGE_HOSTS = [
-  'ae01.alicdn.com', 'ae02.alicdn.com', 'ae03.alicdn.com', 'ae04.alicdn.com',
-  'i.ebayimg.com',
-  'images-na.ssl-images-amazon.com', 'm.media-amazon.com',
-  'images.unsplash.com',
-];
-
-function isAllowedImageUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
-      ALLOWED_IMAGE_HOSTS.some((host) => parsed.hostname.endsWith(host))
-    );
-  } catch {
-    return false;
-  }
-}
-
-/** POST /api/scraper/import — saves product as draft, uploading image to Cloudinary if needed */
-router.post('/import', protect, adminOnly, async (req: AuthRequest, res: Response) => {
-  try {
-    const { name, price, image, description, category, stock, sourceUrl, supplierPrice, source } = req.body;
-    if (!name || !price) return res.status(400).json({ message: 'name and price required' });
-
-    // Upload external image URL to Cloudinary so we own the asset.
-    // Only upload from known, trusted hosts to prevent SSRF and quota abuse.
-    let finalImage = image || '';
-    if (image && isAllowedImageUrl(image)) {
-      try {
-        const result = await cloudinary.uploader.upload(image, {
-          folder: 'techstore/products',
-          resource_type: 'image',
-          transformation: [{ width: 800, crop: 'limit', quality: 'auto' }],
-        });
-        finalImage = result.secure_url;
-        console.log(`☁️  Image uploaded to Cloudinary: ${finalImage}`);
-      } catch (e) {
-        console.warn('Cloudinary upload failed, using original URL:', (e as Error).message);
-        finalImage = image;
+      // Optionally enrich with Cloudinary images
+      if (params.cloudinary && products.length > 0) {
+        logger.info(`  ☁️  Uploading ${products.length} images to Cloudinary...`);
+        try {
+          const enriched = await enrichProductsWithCloudinary(
+            products,
+            'products/scraped'
+          );
+          products = enriched as any;
+          logger.info(`  ✅ Cloudinary enrichment complete`);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Unknown error';
+          logger.warn(`  ⚠️ Cloudinary enrichment failed: ${msg}`);
+        }
       }
+
+      // Persist to MongoDB (non-blocking)
+      if (products.length > 0) {
+        ScrapedResult.create({
+          query: params.q,
+          source: products[0].source,
+          products,
+          count: products.length,
+        }).catch((e: Error) =>
+          logger.warn(`MongoDB save failed: ${e.message}`)
+        );
+      }
+
+      res.json({
+        products,
+        count: products.length,
+        cloudinaryEnriched: params.cloudinary,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return handleValidationError(error, res);
+      }
+
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`/search failed: ${msg}`);
+      res.status(500).json({
+        message: 'Scraping failed',
+        error: msg,
+      });
     }
-
-    const product = await Product.create({
-      name,
-      price: Number(price),
-      image: finalImage,
-      description: description || '',
-      category: category || 'Accessories',
-      stock: Number(stock) || 10,
-      published: false,          // starts as draft — admin activates from panel
-      source: source || 'import',
-      sourceUrl: sourceUrl || '',
-      supplierPrice: Number(supplierPrice) || 0,
-    });
-    res.status(201).json({ message: 'Product saved as draft. Activate it from the admin panel.', product });
-  } catch (err) {
-    res.status(400).json({ message: 'Import failed', error: String(err) });
   }
-});
+);
 
-/** GET /api/scraper/history — returns past scraping sessions stored in MongoDB */
-router.get('/history', scraperLimiter, protect, adminOnly, async (_req: AuthRequest, res: Response) => {
+/**
+ * GET /api/scraper/compare
+ * Compare prices across multiple marketplaces side-by-side
+ */
+router.get(
+  '/compare',
+  scraperLimiter,
+  protect,
+  adminOnly,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const params = parseQueryParams(ScraperCompareParamsSchema, req.query);
+      logger.info(`📊 /compare: query="${params.q}" limit=${params.limit}`);
+      const results = await compareEngines(params.q, params.limit);
+      res.json({ results, query: params.q });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return handleValidationError(error, res);
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`/compare failed: ${msg}`);
+      res.status(500).json({ message: 'Comparison scraping failed', error: msg });
+    }
+  }
+);
+
+/**
+ * GET /api/scraper/market
+ * Analyze market size, growth rate, seasonality
+ */
+router.get(
+  '/market',
+  scraperLimiter,
+  protect,
+  adminOnly,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const params = parseQueryParams(MarketAnalysisParamsSchema, req.query);
+      logger.info(
+        `📈 /market: query="${params.q}" category="${params.category}"`
+      );
+      const analysis = await analyzeMarket(params.q ?? '', params.category ?? 'Accessories');
+      res.json(analysis);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return handleValidationError(error, res);
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`/market failed: ${msg}`);
+      res.status(500).json({ message: 'Market analysis failed', error: msg });
+    }
+  }
+);
+
+/**
+ * GET /api/scraper/suppliers
+ * Find suppliers on Alibaba
+ */
+router.get(
+  '/suppliers',
+  scraperLimiter,
+  protect,
+  adminOnly,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const params = parseQueryParams(SupplierFinderParamsSchema, req.query);
+      logger.info(
+        `🏭 /suppliers: query="${params.q}" category="${params.category}"`
+      );
+      const suppliers = await findSuppliers(
+        params.q ?? '',
+        params.category ?? 'Accessories',
+        params.count ?? 6,
+      );
+      res.json({ suppliers, count: suppliers.length });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return handleValidationError(error, res);
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`/suppliers failed: ${msg}`);
+      res.status(500).json({ message: 'Supplier scraping failed', error: msg });
+    }
+  }
+);
+
+/**
+ * GET /api/scraper/optimize
+ * Generate SEO-optimized product title and bullets
+ */
+router.get('/optimize', protect, adminOnly, (req: AuthRequest, res: Response) => {
   try {
-    const results = await ScrapedResult.find()
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .select('query source count createdAt');
-    res.json({ results });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch history', error: String(err) });
+    const params = parseQueryParams(ListingOptimizerParamsSchema, req.query);
+    logger.debug(`✨ /optimize: name="${params.name}" category="${params.category}"`);
+    const result = optimizeListing(params.name ?? '', params.category ?? 'Accessories');
+    res.json(result);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return handleValidationError(error, res);
+    }
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error(`/optimize failed: ${msg}`);
+    res.status(400).json({ message: 'Optimization failed', error: msg });
   }
 });
+
+/**
+ * POST /api/scraper/calculate
+ * Calculate profit margins and ROI
+ */
+router.post(
+  '/calculate',
+  protect,
+  adminOnly,
+  (req: AuthRequest, res: Response) => {
+    try {
+      const body = parseQueryParams(ProfitCalculatorBodySchema, req.body);
+      logger.debug(
+        `💰 /calculate: selling=${body.sellingPrice} cost=${body.supplierCost}`
+      );
+      const result = calculateProfit(body);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return handleValidationError(error, res);
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`/calculate failed: ${msg}`);
+      res.status(400).json({ message: 'Calculation failed', error: msg });
+    }
+  }
+);
+
+/**
+ * POST /api/scraper/import
+ * Save a scraped product as draft with optional Cloudinary upload
+ */
+router.post(
+  '/import',
+  protect,
+  adminOnly,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const body = parseQueryParams(ImportProductBodySchema, req.body);
+      logger.info(`📥 /import: name="${body.name}" price=${body.price}`);
+
+      let finalImage = body.image || '';
+      if (body.image && isAllowedImageUrl(body.image)) {
+        try {
+          logger.debug(`  Uploading image to Cloudinary...`);
+          const uploaded = await uploadImageFromUrl(body.image, 'products/scraped');
+          finalImage = uploaded.url;
+          logger.debug(`  ☁️  Image uploaded: ${uploaded.publicId}`);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'Unknown error';
+          logger.warn(`  ⚠️ Cloudinary upload failed: ${msg}`);
+        }
+      }
+
+      const product = await Product.create({
+        name: body.name,
+        price: body.price,
+        image: finalImage,
+        description: body.description || '',
+        category: body.category,
+        stock: body.stock,
+        published: false,
+        source: body.source,
+        sourceUrl: body.sourceUrl,
+        supplierPrice: body.supplierPrice,
+      });
+
+      logger.info(`  ✅ Product imported as draft: ${product._id}`);
+
+      res.status(201).json({
+        message: 'Product saved as draft. Activate it from the admin panel.',
+        product,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return handleValidationError(error, res);
+      }
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`/import failed: ${msg}`);
+      res.status(400).json({ message: 'Import failed', error: msg });
+    }
+  }
+);
+
+/**
+ * GET /api/scraper/history
+ * Retrieve past scraping sessions (last 50)
+ */
+router.get(
+  '/history',
+  scraperLimiter,
+  protect,
+  adminOnly,
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      logger.debug(`📜 /history: Fetching last 50 scraping sessions`);
+      const results = await ScrapedResult.find()
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .select('query source count createdAt');
+      res.json({ results });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`/history failed: ${msg}`);
+      res.status(500).json({ message: 'Failed to fetch history', error: msg });
+    }
+  }
+);
 
 export default router;

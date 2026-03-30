@@ -201,3 +201,30 @@ export async function markAllNotificationsRead() {
   if (!res.ok) throw new Error('Error al marcar notificaciones');
   return res.json();
 }
+
+// ─── Admin Users ───────────────────────────────────────────
+export async function getUsers() {
+  const res = await fetch(`${API_URL}/api/users`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Error al cargar usuarios');
+  return res.json();
+}
+
+export async function updateUserRole(id: string, role: string) {
+  const res = await fetch(`${API_URL}/api/users/${id}/role`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) throw new Error('Error al actualizar rol');
+  return res.json();
+}
+
+export async function apiFetch(path: string, options: RequestInit = {}) {
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
+  return data;
+}

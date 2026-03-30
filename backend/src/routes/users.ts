@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { protect, AuthRequest } from '../middleware/auth';
+import { protect, adminOnly, AuthRequest } from '../middleware/auth';
 import { User } from '../models/User';
 import { Product } from '../models/Product';
 
@@ -95,6 +95,33 @@ router.delete('/wishlist/:productId', protect, async (req: AuthRequest, res: Res
     ).populate('wishlist');
 
     res.json({ message: 'Removed from wishlist', wishlist: user?.wishlist });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+// ─── ADMIN ────────────────────────────────────────────────────────────────────
+
+// GET /api/users — list all users (admin only)
+router.get('/', protect, adminOnly, async (_req: AuthRequest, res: Response) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err });
+  }
+});
+
+// PATCH /api/users/:id/role — change user role (admin only)
+router.patch('/:id/role', protect, adminOnly, async (req: AuthRequest, res: Response) => {
+  try {
+    const { role } = req.body;
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err });
   }
