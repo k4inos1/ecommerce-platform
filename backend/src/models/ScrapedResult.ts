@@ -4,7 +4,7 @@ export interface IScrapedProduct {
   name: string;
   price: number;
   image: string;                    // Original image URL from source
-  cloudinaryImage?: {               // Cloudinary hosted image
+  cloudinaryImage: {                // Cloudinary hosted image (always present, possibly with empty/default values)
     url: string;                    // Secure HTTPS URL from Cloudinary
     publicId: string;               // Cloudinary public ID for deletion/updates
     width: number;
