@@ -83,6 +83,10 @@ export default function MyOrdersPage() {
                   <span className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-medium ${cfg.color}`}>
                     {cfg.icon} {cfg.label}
                   </span>
+                  <Link href={`/orders/${order._id}`} onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium whitespace-nowrap">
+                    Ver detalle →
+                  </Link>
                 </button>
 
                 {/* Expanded */}

@@ -88,16 +88,19 @@
 
 ---
 
-## 📋 Sprint 6.0 — Roadmap (Pending)
+## ✅ Sprint 6.0 — Completed
 
-| Feature | Priority | Notes |
-|---------|----------|-------|
-| Wishlist / favorites | High | Save products across sessions |
-| Push notifications (order status changes) | High | Email + in-app |
-| Coupon / discount code system | Medium | Admin creates codes; applied at checkout |
-| Product recommendations | Medium | "Customers also bought" section |
-| Multi-currency support | Low | Display prices in USD / CLP |
-| SEO optimization (sitemap, meta tags) | Low | `next-sitemap` or manual |
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Wishlist / favorites | ✅ Done | Persistent across sessions; `GET/POST/DELETE /api/users/wishlist` + frontend at `/wishlist` |
+| Push notifications (order status changes) | ✅ Done | In-app via `Notification` model + `NotificationsContext`; email on order create |
+| Coupon / discount code system | ✅ Done | Admin CRUD at `/admin/coupons`; validation at checkout via `POST /api/coupons/validate` |
+| Product recommendations | ✅ Done | `GET /api/products/:id/related` + displayed on product detail page |
+| Multi-currency support | ✅ Done | `CurrencyContext` (USD/CLP, fixed rate 940) wrapped in root layout |
+| SEO optimization (sitemap, meta tags) | ✅ Done | `robots.ts` + `sitemap.ts` in Next.js App Router; OpenGraph meta in `layout.tsx` |
+| Support chat | ✅ Done | `POST/GET /api/support/*` + `SupportChat` component + admin inbox at `/admin/support` |
+| Order detail page | ✅ Done | `/orders/[id]` with progress tracker, items, shipping & payment info |
+| Register page | ✅ Done | `/register` — standalone registration page with OAuth + email form |
 
 ---
 
