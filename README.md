@@ -1,141 +1,196 @@
 <div align="center">
 
-# 🛍️ TechStore — E-Commerce Platform
+# TechStore — E-Commerce Platform
 
-**Full-stack e-commerce with Node.js, Express, MongoDB & Next.js**
+Plataforma full‑stack de comercio electrónico construida con Node.js, Express, MongoDB y Next.js.
 
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.1-000000?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)](https://typescriptlang.org)
-[![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=flat-square&logo=next.js&logoColor=white)](https://nextjs.org)
-[![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white)](https://mongodb.com)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
-[![Stripe](https://img.shields.io/badge/Stripe-008CDD?style=flat-square&logo=stripe&logoColor=white)](https://stripe.com)
+[![CI — Backend](https://github.com/k4inos1/ecommerce-platform/actions/workflows/backend-ci.yml/badge.svg?branch=master)](https://github.com/k4inos1/ecommerce-platform/actions/workflows/backend-ci.yml)
+[![CI — Frontend](https://github.com/k4inos1/ecommerce-platform/actions/workflows/frontend-ci.yml/badge.svg?branch=master)](https://github.com/k4inos1/ecommerce-platform/actions/workflows/frontend-ci.yml)
+[![Licencia](https://img.shields.io/badge/Licencia-MIT-blue?style=flat-square)](LICENSE)
 
 </div>
 
----
+## Tabla de contenidos
 
-## 🏗️ Arquitectura
+- [Resumen](#resumen)
+- [Características](#características)
+- [Stack](#stack)
+- [Arquitectura](#arquitectura)
+- [Requisitos](#requisitos)
+- [Instalación y puesta en marcha](#instalación-y-puesta-en-marcha)
+- [Datos de demostración](#datos-de-demostración)
+- [Variables de entorno](#variables-de-entorno)
+- [Scripts útiles](#scripts-útiles)
+- [API](#api)
+- [Despliegue](#despliegue)
+- [Contribución](#contribución)
+- [Código de conducta](#código-de-conducta)
+- [Licencia](#licencia)
+- [Autor](#autor)
+
+## Resumen
+
+TechStore es una plataforma de comercio electrónico con backend en Express y frontend en Next.js. Incluye catálogo de productos, autenticación JWT, carrito persistente, checkout con Stripe y un panel administrativo para gestionar productos y órdenes.
+
+## Características
+
+- Autenticación con JWT y roles (admin/usuario)
+- CRUD de productos con búsqueda y paginación
+- Carrito persistente en cliente
+- Checkout con Stripe y soporte para Transbank (modo integración/producción)
+- Subida de imágenes vía Cloudinary
+- Panel administrativo para productos, órdenes y cupones
+- UI responsive con Tailwind CSS
+
+## Stack
+
+- **Backend:** Node.js 20+, Express, MongoDB, Mongoose, TypeScript
+- **Frontend:** Next.js 16, React 18, Tailwind CSS
+- **Pagos:** Stripe, Transbank
+- **Media:** Cloudinary
+
+## Arquitectura
 
 ```
 ecommerce-platform/
-├── backend/                    # REST API (Puerto :4000)
+├── backend/                    # API REST (Puerto :4000)
 │   └── src/
-│       ├── models/             ← User, Product, Order (Mongoose)
-│       ├── routes/             ← /auth /products /orders
-│       ├── middleware/         ← JWT protect + adminOnly guard
-│       ├── config/             ← seed.ts (datos demo)
-│       └── index.ts            ← Express entry point
+│       ├── models/             # User, Product, Order (Mongoose)
+│       ├── routes/             # /auth /products /orders
+│       ├── middleware/         # JWT protect + adminOnly guard
+│       ├── services/           # Stripe, Transbank, Cloudinary
+│       └── index.ts            # Express entry point
 └── frontend/                   # Next.js App (Puerto :3000)
     └── app/
-        ├── page.tsx            ← Homepage premium
-        ├── products/           ← Listing + filtros + búsqueda
-        ├── products/[id]/      ← Detalle con galería y ratings
-        ├── cart/               ← Carrito con qty controls
-        └── checkout/           ← Formulario + Stripe checkout
+        ├── page.tsx            # Home
+        ├── products/           # Listing + filtros + búsqueda
+        ├── products/[id]/      # Detalle con galería y ratings
+        ├── cart/               # Carrito
+        └── checkout/           # Checkout
 ```
 
-## ✨ Features
+## Requisitos
 
-| Módulo | Tecnología | Descripción |
-|--------|-----------|-------------|
-| 🔐 Auth | JWT + bcrypt | Registro, login, roles admin/user |
-| 📦 Productos | MongoDB + text index | CRUD, búsqueda full-text, paginación |
-| 🛒 Carrito | React Context + localStorage | Persistente entre sesiones |
-| 💳 Checkout | Stripe (simulado) | Formulario completo con animación de pago |
-| 🗄️ Base de datos | MongoDB + Mongoose | Modelos tipados con TypeScript |
-| 📱 UI | Next.js 15 + Tailwind | Dark mode premium, responsive |
+- Node.js **>= 20**
+- npm **>= 10**
+- MongoDB **>= 6** (local o Atlas)
 
-## 🚀 Inicio Rápido
+## Instalación y puesta en marcha
 
-### 1. Requisitos
-```
-Node.js >= 18
-MongoDB >= 6 (local o MongoDB Atlas)
-```
+### 1) Instalar dependencias
 
-### 2. Backend
 ```bash
-cd backend
 npm install
-cp .env.example .env       # Editar las variables
-npm run dev                # Arranca en :4000
 ```
 
-### 3. Seed de datos demo
+### 2) Backend
+
+```bash
+cp backend/.env.example backend/.env
+# editar variables de entorno
+npm run dev --workspace=backend
+```
+
+### 3) Frontend
+
+```bash
+cp frontend/.env.local.example frontend/.env.local
+# editar NEXT_PUBLIC_API_URL
+npm run dev --workspace=frontend
+```
+
+## Datos de demostración
+
 ```bash
 cd backend
 npx ts-node src/config/seed.ts
-# Crea 8 productos + admin@techstore.cl (admin123456) + user@test.cl (user123456)
 ```
 
-### 4. Frontend
+Esto crea 8 productos y cuentas demo:
+
+- `admin@techstore.cl` / `admin123456`
+- `user@test.cl` / `user123456`
+
+## Variables de entorno
+
+### Backend — `backend/.env`
+
+| Variable | Descripción | Obligatoria |
+| --- | --- | --- |
+| `PORT` | Puerto del servidor | Sí |
+| `MONGODB_URI` | URI de MongoDB | Sí |
+| `JWT_SECRET` | Secreto JWT | Sí |
+| `CLIENT_URL` | URL del frontend | Sí |
+| `STRIPE_SECRET_KEY` | Llave secreta Stripe | No |
+| `STRIPE_WEBHOOK_SECRET` | Webhook Stripe | No |
+| `TRANSBANK_COMMERCE_CODE` | Commerce code Transbank | No |
+| `TRANSBANK_API_KEY` | API key Transbank | No |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | No |
+| `CLOUDINARY_API_KEY` | Cloudinary API key | No |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret | No |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | No |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth secret | No |
+| `FACEBOOK_APP_ID` | Facebook App ID | No |
+| `FACEBOOK_APP_SECRET` | Facebook App Secret | No |
+| `EMAIL_USER` | Usuario SMTP | No |
+| `EMAIL_PASS` | Password SMTP | No |
+
+### Frontend — `frontend/.env.local`
+
+| Variable | Descripción | Obligatoria |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | URL del backend | Sí |
+| `NEXT_PUBLIC_STRIPE_KEY` | Stripe publishable key | No |
+
+## Scripts útiles
+
 ```bash
-cd frontend
-npm install
-cp .env.local.example .env.local   # Editar NEXT_PUBLIC_API_URL
-npm run dev                        # Arranca en :3000
+# Desarrollo
+npm run dev:backend
+npm run dev:frontend
+
+# Build
+npm run build --workspace=backend
+npm run build --workspace=frontend
 ```
 
-## 🔑 Variables de Entorno
+## API
 
-### Backend — `.env`
-```env
-PORT=4000
-MONGODB_URI=mongodb://localhost:27017/ecommerce
-JWT_SECRET=cambiar-en-produccion-con-valor-aleatorio-largo
-STRIPE_SECRET_KEY=sk_test_...
-CLIENT_URL=http://localhost:3000
-```
+Rutas principales:
 
-### Frontend — `.env.local`
-```env
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_STRIPE_KEY=pk_test_...
-```
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/products`
+- `GET /api/products/:id`
+- `POST /api/orders`
+- `GET /api/orders/my`
 
-## 📡 API — Endpoints
+Revisa `backend/src/routes` para el detalle completo de endpoints.
 
-<details>
-<summary><b>🔐 Autenticación</b></summary>
+## Despliegue
 
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| `POST` | `/api/auth/register` | ❌ | Crear cuenta |
-| `POST` | `/api/auth/login` | ❌ | Login → JWT |
+- **Backend:** Railway (`nixpacks.toml`, `railway.json`)
+- **Frontend:** Vercel
+- **CI:** GitHub Actions para type-check y builds
 
-</details>
+## Contribución
 
-<details>
-<summary><b>📦 Productos</b></summary>
+Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para el flujo de trabajo recomendado.
 
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| `GET` | `/api/products` | ❌ | Listar (paginado, filtros) |
-| `GET` | `/api/products/:id` | ❌ | Detalle |
-| `POST` | `/api/products` | 🔑 Admin | Crear |
-| `PUT` | `/api/products/:id` | 🔑 Admin | Actualizar |
-| `DELETE` | `/api/products/:id` | 🔑 Admin | Eliminar |
+## Código de conducta
 
-**Query params:** `?search=laptop&category=Laptops&page=1&limit=12`
+Este proyecto adopta el [Código de Conducta](CODE_OF_CONDUCT.md).
 
-</details>
+## Licencia
 
-<details>
-<summary><b>📋 Órdenes</b></summary>
+Distribuido bajo la licencia [MIT](LICENSE).
 
-| Método | Ruta | Auth | Descripción |
-|--------|------|------|-------------|
-| `POST` | `/api/orders` | 🔑 User | Crear orden |
-| `GET` | `/api/orders/my` | 🔑 User | Mis órdenes |
-| `GET` | `/api/orders/:id` | 🔑 User/Admin | Detalle |
-| `PATCH` | `/api/orders/:id/status` | 🔑 Admin | Actualizar estado |
-| `GET` | `/api/orders` | 🔑 Admin | Todas las órdenes |
-
-</details>
-
-## 👨‍💻 Autor
+## Autor
 
 **Ricardo Sanhueza** — Full Stack Developer  
-📍 Concepción, Chile | 📧 ricardosanhuezaacuna@gmail.com  
-🔗 [Portfolio](https://v0-k4inos1.vercel.app) · [GitHub](https://github.com/k4inos1)
+Concepción, Chile · 📧 ricardosanhuezaacuna@gmail.com  
+Portfolio: https://v0-k4inos1.vercel.app · GitHub: https://github.com/k4inos1
