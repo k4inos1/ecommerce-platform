@@ -1,13 +1,8 @@
-import { v2 as cloudinary } from 'cloudinary';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-// Configurar Cloudinary con credenciales de .env
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-export default cloudinary;
+/**
+ * @deprecated Use `../services/cloudinary` directly.
+ * This re-export exists only for backward compatibility.
+ * The canonical Cloudinary configuration lives in services/cloudinary.ts
+ * which uses lazy initialization to avoid crashing the server on startup
+ * when Cloudinary credentials are missing.
+ */
+export { default } from '../services/cloudinary';

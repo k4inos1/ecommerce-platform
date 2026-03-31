@@ -4,7 +4,12 @@ import { v2 as cloudinary } from 'cloudinary';
 // can start (and pass health-checks) even when Cloudinary env vars are absent.
 let _configured = false;
 
-function ensureConfigured(): void {
+/**
+ * Lazily applies Cloudinary credentials from environment variables.
+ * Safe to call multiple times — runs the config block only once.
+ * Export allows other services to opt-in to lazy init rather than eager config.
+ */
+export function ensureConfigured(): void {
   if (_configured) return;
   _configured = true;
   cloudinary.config({
