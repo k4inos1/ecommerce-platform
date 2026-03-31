@@ -74,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         <ul className="space-y-2">
                           {[
                             { href: '/login', label: 'Iniciar sesión' },
-                            { href: '/login', label: 'Registrarse' },
+                            { href: '/register', label: 'Registrarse' },
                             { href: '/mis-ordenes', label: 'Mis órdenes' },
                             { href: '/wishlist', label: 'Lista de deseos' },
                             { href: '/profile', label: 'Mi perfil' },

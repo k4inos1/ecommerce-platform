@@ -15,6 +15,7 @@ import stripeRoutes from './routes/stripe';
 import transbankRoutes from './routes/transbank';
 import couponRoutes from './routes/coupons';
 import notificationRoutes from './routes/notifications';
+import supportRoutes from './routes/support';
 
 dotenv.config();
 
@@ -54,6 +55,7 @@ app.use('/api/stripe', stripeRoutes);
 app.use('/api/transbank', transbankRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/support', supportRoutes);
 
 // Health check — always responds, even without DB
 app.get('/api/health', (_req, res) => {
