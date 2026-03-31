@@ -293,11 +293,13 @@ router.post(
       logger.info(`📥 /import: name="${body.name}" price=${body.price}`);
 
       let finalImage = body.image || '';
+      let cloudinaryPublicId = '';
       if (body.image && isAllowedImageUrl(body.image)) {
         try {
           logger.debug(`  Uploading image to Cloudinary...`);
           const uploaded = await uploadImageFromUrl(body.image, 'products/scraped');
           finalImage = uploaded.url;
+          cloudinaryPublicId = uploaded.publicId;
           logger.debug(`  ☁️  Image uploaded: ${uploaded.publicId}`);
         } catch (error) {
           const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -309,6 +311,7 @@ router.post(
         name: body.name,
         price: body.price,
         image: finalImage,
+        cloudinaryPublicId,
         description: body.description || '',
         category: body.category,
         stock: body.stock,
